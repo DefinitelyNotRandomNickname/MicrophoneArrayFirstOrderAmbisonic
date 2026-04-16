@@ -1,0 +1,56 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "mafoa"
+version = "0.1.0"
+description = "Microphone Array First-Order Ambisonic processing with deep learning"
+readme = "README.md"
+requires-python = ">=3.11"
+license = {text = "MIT"}
+authors = [
+    {name = "Paweł Warlewski", email = "p.warlewski2@samsung.com"}
+]
+keywords = ["audio", "ambisonics", "deep-learning", "microphone-array"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Science/Research",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+]
+
+dependencies = [
+    "torch>=2.0.0",
+    "pytorch-lightning>=2.0.0",
+    "numpy>=1.21.0",
+    "pyyaml>=6.0",
+    "h5py>=3.0.0",
+    "pyroomacoustics>=0.7.0",
+    "matplotlib>=3.5.0",
+    "soundfile>=0.13.0",
+    "tensorboard>=2.0.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.0.0",
+    "black>=23.0.0",
+    "isort>=5.0.0",
+    "flake8>=5.0.0",
+]
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["data", "models", "projects", "utils"]
+
+[tool.black]
+line-length = 88
+target-version = ["py311", "py312"]
+
+[tool.isort]
+profile = "black"
+line_length = 88

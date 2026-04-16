@@ -1,0 +1,15 @@
+model:
+  model_name: UNet
+  
+  out_channels: 8
+  repeats: 2
+  channels:
+  - [8, 32]
+  - [32, 64]
+  - [64, 128]
+  - [128, 256]
+  kernel_size: 3
+  stride: 2
+
+  norm: batch
+  activation: leaky_relu

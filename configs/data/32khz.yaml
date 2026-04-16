@@ -1,0 +1,19 @@
+data:
+  seconds: 1
+  sr: 32000
+
+  train_rir_path: tmp/rir_dataset_square_32khz_1s.h5
+  valid_rir_path: tmp/val_rir_dataset_square_32khz_1s.h5
+  audio_paths:
+  - /data/soundsource/dns32k_trim/DNS2022_speech_mos42/clean_fullband/read_speech
+  noise_paths:
+  - /data/soundsource/noise32k/DNS_noise_fullband
+
+  max_len: 1e4
+
+  stft:
+    n_fft: 1024
+    hop_length: 256   # 75% overlap
+    win_length: 1024
+  
+  normalize: True
