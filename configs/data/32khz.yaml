@@ -2,8 +2,8 @@ data:
   seconds: 1
   sr: 32000
 
-  train_rir_path: tmp/rir_dataset_square_32khz_1s.h5
-  valid_rir_path: tmp/val_rir_dataset_square_32khz_1s.h5
+  train_rir_path: tmp/train_rir_dataset_square_32000hz_3.0s.h5
+  valid_rir_path: tmp/valid_rir_dataset_square_32000hz_3.0s.h5
   audio_paths:
   - /data/soundsource/dns32k_trim/DNS2022_speech_mos42/clean_fullband/read_speech
   noise_paths:

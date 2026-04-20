@@ -72,16 +72,13 @@ class SpatialAudioDataset(Dataset):
 
         return audio.astype(np.float32)
 
-    def _mix_sources(self):
-        mix = np.zeros(self.segment_samples, dtype=np.float32)
-
+    def _get_sources(self):
+        sources = []
         for _ in range(self.num_sources):
             path = random.choice(self.audio_paths)
             audio = self._load_audio(path)
-            mix += audio
-
-        mix /= max(self.num_sources, 1)
-        return mix
+            sources.append(audio)
+        return sources
     
     def _generate_noise(self, signal):
         if not self.noise_paths or self.snr_db is None:
@@ -100,24 +97,45 @@ class SpatialAudioDataset(Dataset):
 
     def __getitem__(self, idx):
 
-        # Get audio
-        audio = self._mix_sources()
+        # Get audio sources
+        sources = self._get_sources()
 
         # Sample RIRs
         rir_idx = random.randint(0, len(self.rir_mems) - 1)
-        mems_rir = self.rir_mems[rir_idx]
-        foa_rir = self.rir_foa[rir_idx]
+        mems_rirs = self.rir_mems[rir_idx]  # (num_sources, 4, rir_length)
+        foa_rirs = self.rir_foa[rir_idx]    # (num_sources, 4, rir_length)
 
-        # Convolve RIRs onto audio, TODO: Add proper multi source
-        mems = fft_convolve(audio, mems_rir)
-        foa = fft_convolve(audio, foa_rir)
+        # Convolve each source with its corresponding RIRs and mix
+        mems = None
+        foa = None
+        
+        for src_idx, source in enumerate(sources):
+            # Get RIRs for this source
+            mems_rir = mems_rirs[src_idx]  # (4, rir_length)
+            foa_rir = foa_rirs[src_idx]    # (4, rir_length)
+            
+            # Convolve source with its RIRs
+            src_mems = fft_convolve(source, mems_rir)
+            src_foa = fft_convolve(source, foa_rir)
+            
+            # Add to mix
+            if mems is None:
+                mems = src_mems
+                foa = src_foa
+            else:
+                mems += src_mems
+                foa += src_foa
+
+        # Mixing normalization
+        mems /= self.num_sources
+        foa /= self.num_sources
 
         # Add noise with given SNR
         noise = self._generate_noise(mems)
         mems += noise
         foa += noise
 
-        # Normalize
+        # Peak-Norm
         if self.normalize:
             max_val = max(np.abs(mems).max(), np.abs(foa).max(), 1e-6)
             mems = mems / max_val
