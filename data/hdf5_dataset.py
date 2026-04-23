@@ -74,7 +74,7 @@ class SpatialAudioDataset(Dataset):
 
     def _get_sources(self):
         sources = []
-        for _ in range(self.num_sources):
+        for _ in range(random.randint(1, self.num_sources)):
             path = random.choice(self.audio_paths)
             audio = self._load_audio(path)
             sources.append(audio)
@@ -127,8 +127,8 @@ class SpatialAudioDataset(Dataset):
                 foa += src_foa
 
         # Mixing normalization
-        mems /= self.num_sources
-        foa /= self.num_sources
+        mems /= len(sources)
+        foa /= len(sources)
 
         # Add noise with given SNR
         noise = self._generate_noise(mems)

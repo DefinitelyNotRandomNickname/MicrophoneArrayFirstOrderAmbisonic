@@ -1,6 +1,7 @@
 data:
-  seconds: 1
+  seconds: 3.0
   sr: 32000
+  num_sources: 6
 
   train_rir_path: tmp/train_rir_dataset_square_32000hz_3.0s.h5
   valid_rir_path: tmp/valid_rir_dataset_square_32000hz_3.0s.h5
