@@ -8,7 +8,7 @@ DATA_CONFIG_PATH="$REPO_PATH/configs/data/${DATA_CONFIG}.yaml"
 MODEL_CONFIG_PATH="$REPO_PATH/configs/models/${MODEL_CONFIG}.yaml"
 TRAINING_CONFIG_PATH="$REPO_PATH/configs/training/${TRAINING_CONFIG}.yaml"
 
-EXP_NAME="UNet_base_8M1"
+EXP_NAME="UNet_base_32M5"
 LOG_DIR="$REPO_PATH/.logs"
 
 
