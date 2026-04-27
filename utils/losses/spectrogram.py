@@ -135,12 +135,16 @@ def foa_energy_ratio_loss(
 # -----------------------------
 
 def spectral_convergence_loss(estimate_mag, target_mag, eps=1e-8, reduction="mean"):
-    diff = torch.linalg.vector_norm(target_mag - estimate_mag, ord="fro", dim=(-2, -1))
-    denom = torch.linalg.vector_norm(target_mag, ord="fro", dim=(-2, -1)).clamp_min(eps)
+    diff = torch.linalg.vector_norm(target_mag - estimate_mag, ord=2, dim=(-2, -1))
+    denom = torch.linalg.vector_norm(target_mag, ord=2, dim=(-2, -1)).clamp_min(eps)
     loss = diff / denom
 
     return reduce_loss(loss, reduction)
 
+
+# -----------------------------
+# Multi resolution STFT loss
+# -----------------------------
 
 def _normalize_resolutions(fft_sizes=None, hop_sizes=None, win_lengths=None):
     if fft_sizes is None:
