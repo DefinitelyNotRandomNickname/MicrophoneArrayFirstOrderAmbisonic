@@ -20,14 +20,23 @@ training:
 
   losses:
     stft_losses:
-      l1:
-        weight: 1.0
-      magnitude:
-        weight: 1.0
-    wave_losses:
-      si_sdr:
-        reduction: mean
-        eps: 1e-9
+      foa_active_intensity_doa:
+        weight: 0.2
+      foa_energy_ratio:
         weight: 0.05
+        ratio_type: directional_to_total
+
+    wave_losses:
+      multi_resolution_stft:
+        weight: 1.0
+        fft_sizes: [512, 1024, 2048]
+        hop_sizes: [128, 256, 512]
+        win_lengths: [512, 1024, 2048]
+      si_sdr:
+        weight: 0.2
+      foa_covariance:
+        weight: 0.2
+        normalize: fro
+        loss_type: l1
 
   masking: complex
