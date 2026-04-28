@@ -40,7 +40,7 @@ def istft_from_spectrogram(x, n_fft, hop_length, win_length, window=None):
     return wave
 
 
-def compute_stft(x, n_fft, hop_length, win_length, window=None, return_real=True):
+def compute_stft(x, n_fft, hop_length, win_length, window=None, interleave=True):
     if isinstance(x, np.ndarray):
         x = torch.from_numpy(x).float()
 
@@ -64,7 +64,7 @@ def compute_stft(x, n_fft, hop_length, win_length, window=None, return_real=True
     if reshape_to_channels:
         stft = stft.view(B, C, stft.size(-2), stft.size(-1))
 
-    if return_real:
+    if interleave:
         return torch.view_as_real(stft)
     return stft
 

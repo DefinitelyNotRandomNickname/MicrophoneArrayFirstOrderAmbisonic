@@ -18,14 +18,14 @@ def l1_loss(estimate, target, **kwargs):
 # Magnitude
 # -----------------------------
 
-def _magnitude(x):
+def _magnitude(x, eps=1e-8):
     xr, xi = split_complex(x)
-    return torch.sqrt(xr**2 + xi**2 + 1e-8)
+    return torch.sqrt(xr**2 + xi**2 + eps)
 
 
-def magnitude_loss(estimate, target, **kwargs):
-    mag_e = _magnitude(estimate)
-    mag_t = _magnitude(target)
+def magnitude_loss(estimate, target, eps=1e-8, **kwargs):
+    mag_e = _magnitude(estimate, eps)
+    mag_t = _magnitude(target, eps)
     return l1_loss(mag_e, mag_t)
 
 
@@ -83,7 +83,6 @@ def foa_active_intensity_doa_loss(
 # -----------------------------
 # FOA energy-ratio loss
 # -----------------------------
-
 
 def foa_energy_ratio_loss(
     estimate,
@@ -199,14 +198,14 @@ def multi_resolution_stft_loss(
             n_fft=n_fft,
             hop_length=hop_length,
             win_length=win_length,
-            return_real=False,
+            interleave=False,
         )
         target_stft = compute_stft(
             target,
             n_fft=n_fft,
             hop_length=hop_length,
             win_length=win_length,
-            return_real=False,
+            interleave=False,
         )
         estimate_mag = torch.sqrt(estimate_stft.real**2 + estimate_stft.imag**2 + eps)
         target_mag = torch.sqrt(target_stft.real**2 + target_stft.imag**2 + eps)
