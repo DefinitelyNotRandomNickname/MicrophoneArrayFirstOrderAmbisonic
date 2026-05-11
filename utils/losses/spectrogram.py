@@ -10,8 +10,8 @@ from utils.losses.utils import reduce_loss, weighted_reduce_loss
 # L1
 # -----------------------------
 
-def l1_loss(estimate, target, **kwargs):
-    return F.l1_loss(estimate, target)
+def l1_loss(estimate, target, reduction="mean", **kwargs):
+    return F.l1_loss(estimate, target, reduction=reduction)
 
 
 # -----------------------------
@@ -51,6 +51,7 @@ def foa_active_intensity_doa_loss(
     energy_weighting=True,
     energy_weight_power=1.0,
     reduction="mean",
+    doa_method="cosine_sim",
     **kwargs,
 ):
     """
@@ -70,8 +71,13 @@ def foa_active_intensity_doa_loss(
     estimate_dir = F.normalize(estimate_intensity, dim=1, eps=eps)
     target_dir = F.normalize(target_intensity, dim=1, eps=eps)
 
-    cosine = (estimate_dir * target_dir).sum(dim=1).clamp(-1.0, 1.0)
-    loss = 1.0 - cosine
+    if doa_method == "cosine_sim":
+        c_sim = torch.nn.CosineSimilarity(dim=1)
+        cosine = c_sim(estimate_dir, target_dir)
+        loss = 1 - cosine
+    elif doa_method == "MAE":
+        loss = l1_loss(estimate_dir, target_dir, reduction="none")
+        loss = torch.mean(loss, dim=1)
 
     weights = None
     if energy_weighting:
