@@ -9,7 +9,7 @@ training:
   devices: [0]
   precision: 32
 
-  monitor: val_loss
+  monitor: val_total_loss
   grad_clip_val: 1.0
 
   lr: 0.001

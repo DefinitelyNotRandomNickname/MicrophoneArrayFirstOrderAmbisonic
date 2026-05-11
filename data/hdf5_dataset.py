@@ -12,7 +12,7 @@ from utils.audio import fft_convolve, compute_stft
 
 
 class SpatialAudioDataset(Dataset):
-    def __init__(self, cfg, rir_path):
+    def __init__(self, cfg, rir_path, stage):
 
         dcfg = cfg["data"]
 
@@ -32,10 +32,13 @@ class SpatialAudioDataset(Dataset):
 
         self.normalize = dcfg.get("normalize", True)
         self.num_sources = dcfg.get("num_sources", 1)
-        self.snr_db = dcfg.get("snr_db", None)
+        self.snr_db = dcfg.get("snr_db", [-10, 10])
 
         self.window = torch.hann_window(self.win)
         self.max_len = int(dcfg.get("max_len", 1e5))
+
+        if stage == "valid":
+            self.max_len //= 50
 
     def __len__(self):
         return self.max_len
@@ -90,7 +93,9 @@ class SpatialAudioDataset(Dataset):
         sig_power = np.mean(signal**2)
         noise_power = np.mean(noise**2) + 1e-12
 
-        target_noise_power = sig_power / (10 ** (self.snr_db / 10))
+        db = random.randint(self.snr_db[0], self.snr_db[1])
+
+        target_noise_power = sig_power / (10 ** (db / 10))
         noise = noise * np.sqrt(target_noise_power / noise_power)
 
         return noise
@@ -133,7 +138,6 @@ class SpatialAudioDataset(Dataset):
         # Add noise with given SNR
         noise = self._generate_noise(mems)
         mems += noise
-        foa += noise
 
         # Peak-Norm
         if self.normalize:

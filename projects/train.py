@@ -31,7 +31,7 @@ def build_dataloaders(cfg):
     train_rir = dcfg["train_rir_path"]
     valid_rir = dcfg["valid_rir_path"]
 
-    train_ds = SpatialAudioDataset(cfg, train_rir)
+    train_ds = SpatialAudioDataset(cfg, train_rir, "train")
     train_loader = DataLoader(
         train_ds,
         batch_size=tcfg.get("batch_size", 8),
@@ -42,7 +42,7 @@ def build_dataloaders(cfg):
         drop_last=True,
     )
 
-    valid_ds = SpatialAudioDataset(cfg, valid_rir)
+    valid_ds = SpatialAudioDataset(cfg, valid_rir, "valid")
     valid_loader = DataLoader(
         valid_ds,
         batch_size=tcfg.get("batch_size", 8),
@@ -71,7 +71,7 @@ def build_trainer(cfg, args):
     )
 
     checkpoint_cb = ModelCheckpoint(
-        monitor=tcfg.get("monitor", "val_loss"),
+        monitor=tcfg.get("monitor", "val_total_loss"),
         mode="min",
         save_top_k=3,
         save_last=True,

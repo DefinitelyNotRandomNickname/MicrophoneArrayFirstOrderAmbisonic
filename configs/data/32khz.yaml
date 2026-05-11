@@ -10,6 +10,7 @@ data:
   noise_paths:
   - /data/soundsource/noise32k/DNS_noise_fullband
 
+  snr_db: [-10, 10]
   max_len: 1e4
 
   stft:
