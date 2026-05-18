@@ -1,6 +1,6 @@
 import torch.nn as nn
 
-from models.conformer.encoders import ConformerConvModule
+from models.conformer.convs import ConformerConvModule
 from models.layers.feedforwards import FeedForwardModule
 
 
