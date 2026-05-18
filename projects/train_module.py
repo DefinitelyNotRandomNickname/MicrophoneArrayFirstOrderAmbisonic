@@ -6,6 +6,7 @@ from utils.audio import istft_from_spectrogram
 from utils.complex import ri_to_channels, channels_to_ri
 from utils.losses import SPECTROGRAM_LOSSES, WAVE_LOSSES
 from utils.masking import MASKS
+from projects.schedulers import build_lr_scheduler
 
 
 class TrainingModule(pl.LightningModule):
@@ -16,7 +17,9 @@ class TrainingModule(pl.LightningModule):
         self.tcfg = cfg["training"]
         self.dcfg = cfg["data"]
 
-        self.model = MODELS[self.mcfg["model_name"]](self.mcfg).to(self.device, dtype=self.dtype)
+        self.model = MODELS[self.mcfg["model_name"]](self.mcfg).to(
+            self.device, dtype=self.dtype
+        )
 
         self.masking_fn = MASKS[self.tcfg.get("masking", "complex")]
 
@@ -43,7 +46,7 @@ class TrainingModule(pl.LightningModule):
 
         pred = self(x_complex)
         pred = channels_to_ri(pred)
-        
+
         y_hat = self.masking_fn(x, pred)
 
         loss = self.calculate_losses(y_hat, y, stage)
@@ -80,34 +83,17 @@ class TrainingModule(pl.LightningModule):
 
     def configure_optimizers(self):
         optimizer = torch.optim.AdamW(
-            self.parameters(),
-            lr=self.lr,
-            weight_decay=self.weight_decay
+            self.parameters(), lr=self.lr, weight_decay=self.weight_decay
         )
 
-        sched_cfg = self.dcfg.get("training", {}).get("scheduler", None)
+        sched_cfg = self.tcfg.get("scheduler", None)
 
         if sched_cfg is None:
             return optimizer
 
-        if sched_cfg["type"] == "step":
-            scheduler = torch.optim.lr_scheduler.StepLR(
-                optimizer,
-                step_size=sched_cfg.get("step_size", 10),
-                gamma=sched_cfg.get("gamma", 0.5)
-            )
-
-        elif sched_cfg["type"] == "cosine":
-            scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(
-                optimizer,
-                T_max=sched_cfg.get("T_max", 50)
-            )
-        else:
-            raise ValueError("Unsupported scheduler type")
-
         return {
             "optimizer": optimizer,
-            "lr_scheduler": scheduler,
+            "lr_scheduler": build_lr_scheduler(optimizer, sched_cfg, self),
         }
 
     def on_before_optimizer_step(self, optimizer):
