@@ -3,7 +3,7 @@ training:
 
   batch_size: 16
   num_workers: 16
-  max_epochs: 1000
+  max_epochs: 400
 
   strategy: auto
   devices: [0]
@@ -16,14 +16,21 @@ training:
   weight_decay: 0.05
   scheduler:
     type: cosine
-    T_max: 50
+    interval: step
+    total_steps: auto
+    warmup_steps: 10000
+    warmup_start_factor: 0.01
+    min_lr: 1e-6
 
   losses:
     stft_losses:
       foa_active_intensity_doa:
-        weight: 0.5
+        weight: 1.0
+        doa_method: cosine_sim
+        sim_dim: 1 # per-sample
+        energy_weighting: True
       foa_energy_ratio:
-        weight: 0.5
+        weight: 1.0
         ratio_type: directional_to_total
 
     wave_losses:
@@ -35,7 +42,7 @@ training:
       si_sdr:
         weight: 0.2
       foa_covariance:
-        weight: 0.7
+        weight: 1.0
         normalize: fro
         loss_type: l1
 

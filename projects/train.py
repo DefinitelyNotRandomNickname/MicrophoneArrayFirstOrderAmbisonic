@@ -77,14 +77,17 @@ def build_trainer(cfg, args):
         save_last=True,
     )
 
-    lr_monitor = LearningRateMonitor(logging_interval="epoch")
+    lr_monitor = LearningRateMonitor(logging_interval=None)
 
     trainer = pl.Trainer(
         max_epochs=tcfg.get("max_epochs", 100),
+        max_steps=tcfg.get("max_steps", -1),
         accelerator="gpu" if torch.cuda.is_available() else "cpu",
         strategy=tcfg.get("strategy", "auto"),
         devices=tcfg.get("devices", 1),
         precision=tcfg.get("precision", 32),
+        accumulate_grad_batches=tcfg.get("accumulate_grad_batches", 1),
+        log_every_n_steps=tcfg.get("log_every_n_steps", 50),
         logger=logger,
         callbacks=[checkpoint_cb, lr_monitor],
         gradient_clip_val=tcfg.get("grad_clip_val", 1.0),
