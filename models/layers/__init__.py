@@ -1,21 +1,16 @@
-import torch.nn as nn
+from models.layers.activations import get_activation
+from models.layers.convs import ConvBlock, SamePadDepthwiseConv1d
+from models.layers.feedforwards import FeedForwardModule
+from models.layers.norms import get_norm, get_norm_1d, get_norm_2d
+from models.layers.positional import SinusoidalPositionalEncoding
 
-ACTIVATIONS = {
-    "leaky_relu": nn.LeakyReLU(0.2, inplace=True),
-    "relu": nn.ReLU(inplace=True),
-}
-
-NORMALIZATIONS = {
-    "batch": nn.BatchNorm2d,
-    "instance": nn.InstanceNorm2d,
-    None: nn.Identity,
-
-}
-
-
-def get_activation(name):
-    return ACTIVATIONS[name]
-
-
-def get_norm(name, num_channels):
-    return NORMALIZATIONS[name](num_channels)
+__all__ = [
+    "get_activation",
+    "get_norm",
+    "get_norm_1d",
+    "get_norm_2d",
+    "ConvBlock",
+    "SamePadDepthwiseConv1d",
+    "FeedForwardModule",
+    "SinusoidalPositionalEncoding",
+]

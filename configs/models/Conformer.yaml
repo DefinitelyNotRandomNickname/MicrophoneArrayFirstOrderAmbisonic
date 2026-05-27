@@ -1,0 +1,18 @@
+model:
+  model_name: Conformer
+
+  in_channels: 8
+  out_channels: 8
+  num_freqs: 513  # n_fft / 2 + 1 for the 1024-point STFT
+
+  d_model: 128
+  num_layers: 6
+  num_heads: 4
+  ff_expansion_factor: 4
+
+  conv_kernel_size: 31
+  positional_encoding: sinusoidal
+  dropout: 0.1
+
+  conv_norm: batch
+  activation: silu
