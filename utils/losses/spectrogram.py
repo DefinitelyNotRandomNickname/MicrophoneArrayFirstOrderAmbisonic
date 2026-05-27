@@ -33,12 +33,12 @@ def magnitude_loss(estimate, target, eps=1e-8, **kwargs):
 # DOA from FOA active-intensity loss
 # -----------------------------
 
-def _foa_energy(x):
-    return x.abs().square().sum(dim=1)
+def _foa_energy(x, dim=1):
+    return x.abs().square().sum(dim=dim)
 
 
-def _energy_weights(target, power=1.0, eps=1e-8):
-    weights = _foa_energy(target).clamp_min(eps)
+def _energy_weights(target, power=1.0, eps=1e-8, dim=1):
+    weights = _foa_energy(target, dim).clamp_min(eps)
     if power != 1.0:
         weights = weights.pow(power)
     return weights
@@ -52,6 +52,7 @@ def foa_active_intensity_doa_loss(
     energy_weight_power=1.0,
     reduction="mean",
     doa_method="cosine_sim",
+    sim_dim=2,
     **kwargs,
 ):
     """
@@ -71,17 +72,22 @@ def foa_active_intensity_doa_loss(
     estimate_dir = F.normalize(estimate_intensity, dim=1, eps=eps)
     target_dir = F.normalize(target_intensity, dim=1, eps=eps)
 
+    if sim_dim > 1:
+        b, c, t, f = estimate_dir.shape
+        estimate_dir = estimate_dir.view(b, c, t*f)
+        target_dir = target_dir.view(b, c, t*f)
+
     if doa_method == "cosine_sim":
-        c_sim = torch.nn.CosineSimilarity(dim=1)
+        c_sim = torch.nn.CosineSimilarity(dim=sim_dim)
         cosine = c_sim(estimate_dir, target_dir)
         loss = 1 - cosine
     elif doa_method == "MAE":
         loss = l1_loss(estimate_dir, target_dir, reduction="none")
-        loss = torch.mean(loss, dim=1)
+        loss = torch.mean(loss, dim=sim_dim)
 
     weights = None
     if energy_weighting:
-        weights = _energy_weights(target, power=energy_weight_power, eps=eps)
+        weights = _energy_weights(target, power=energy_weight_power, eps=eps, dim=sim_dim)
 
     return weighted_reduce_loss(loss, weights=weights, reduction=reduction, eps=eps)
 
