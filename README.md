@@ -1,7 +1,7 @@
-# MicrophoneArrayFirstOrderAmbisonic
+# Microphone Array First-Order Ambisonic
 
-Project for estimating first-order ambisonic (FOA) signals from a
-microphone-array input using deep learning.
+Project for estimating first-order ambisonic (FOA) signals from an
+irregular omnidirectional microphone-array input using deep learning.
 
 The current pipeline builds synthetic spatial samples from
 speech/noise WAV files and room impulse responses (RIRs), converts them to
@@ -63,7 +63,11 @@ Training merges three YAML files:
 The model config defines network model and layout. The base
 training config sets Lightning trainer options, optimizer settings, a
 scheduler, masking mode, and the active loss terms. Lastly data config specifies
-paths to the training HDF datasets and wav pre-convoluted samples.
+paths to the training HDF datasets and wav pre-convoluted samples. Additionally, 
+microphone matrices come in three different shapes:
+- tetrahedral (default A-Format matrix),
+- square (lowest conversion quality, due to aliasing in 3D),
+- Quasi-Line (for example smartphone microphone array). 
 
 ## Training
 
