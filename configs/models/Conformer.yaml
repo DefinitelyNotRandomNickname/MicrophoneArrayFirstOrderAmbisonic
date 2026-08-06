@@ -3,16 +3,13 @@ model:
 
   in_channels: 8
   out_channels: 8
-  num_freqs: 513  # n_fft / 2 + 1 for the 1024-point STFT
-
-  d_model: 128
-  num_layers: 6
-  num_heads: 4
-  ff_expansion_factor: 4
-
+  num_freqs: 513
+  tf_channels: 256
+  num_layers: 4
+  num_heads: 8
+  ff_expansion_factor: 2
   conv_kernel_size: 31
-  positional_encoding: sinusoidal
   dropout: 0.1
-
-  conv_norm: batch
   activation: silu
+  rnn_hidden: 128
+  add_identity_mask: false
