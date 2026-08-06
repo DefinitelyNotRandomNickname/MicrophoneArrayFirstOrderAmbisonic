@@ -3,8 +3,8 @@ data:
   sr: 32000
   num_sources: 6
 
-  train_rir_path: tmp/train_rir_dataset_square_32000hz_3.0s.h5
-  valid_rir_path: tmp/valid_rir_dataset_square_32000hz_3.0s.h5
+  train_rir_path: tmp/train_rir_dataset_tetrahedron_32000hz_3.0s.h5
+  valid_rir_path: tmp/valid_rir_dataset_tetrahedron_32000hz_3.0s.h5
   audio_paths:
   - /data/soundsource/dns32k_trim/DNS2022_speech_mos42/clean_fullband/read_speech
   noise_paths:
