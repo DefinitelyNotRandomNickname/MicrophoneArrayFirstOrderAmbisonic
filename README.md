@@ -111,7 +111,7 @@ This project is in early stage. With time, more DNN networks, augmentations, and
 
 Model roadmap:
 - [x] UNet,
-- [ ] Conformer,
+- [x] Conformer,
 - [ ] TF-GridNet,
 - [ ] Mamba,
 - [ ] DPRNN/DPTNet.
@@ -129,4 +129,3 @@ Input roadmap:
   locations.
 - Validation uses the same dataset logic as training, with a shorter synthetic
   epoch length and different rooms.
-- The package metadata declares the project license as MIT.
