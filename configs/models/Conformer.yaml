@@ -1,0 +1,15 @@
+model:
+  model_name: Conformer
+
+  in_channels: 8
+  out_channels: 8
+  num_freqs: 513
+  tf_channels: 256
+  num_layers: 4
+  num_heads: 8
+  ff_expansion_factor: 2
+  conv_kernel_size: 31
+  dropout: 0.1
+  activation: silu
+  rnn_hidden: 128
+  add_identity_mask: false

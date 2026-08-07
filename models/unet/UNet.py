@@ -6,10 +6,10 @@ from models.layers.convs import ConvBlock
 
 
 class DownBlock(nn.Module):
-    def __init__(self, in_ch, out_ch, kernel_size, stride, activation, norm, repeats):
+    def __init__(self, in_ch, out_ch, kernel_size, stride, activation, norm_2d, repeats):
         super().__init__()
 
-        self.conv = ConvBlock(in_ch, out_ch, kernel_size, activation, norm, repeats)
+        self.conv = ConvBlock(in_ch, out_ch, kernel_size, activation, norm_2d, repeats)
         self.down = nn.Conv2d(out_ch, out_ch, kernel_size=stride, stride=stride)
 
     def forward(self, x):
@@ -19,11 +19,11 @@ class DownBlock(nn.Module):
 
 
 class UpBlock(nn.Module):
-    def __init__(self, in_ch, out_ch, kernel_size, stride, activation, norm, repeats):
+    def __init__(self, in_ch, out_ch, kernel_size, stride, activation, norm_2d, repeats):
         super().__init__()
 
         self.up = nn.ConvTranspose2d(in_ch, out_ch, kernel_size=stride, stride=stride)
-        self.conv = ConvBlock(in_ch, out_ch, kernel_size, activation, norm, repeats)
+        self.conv = ConvBlock(in_ch, out_ch, kernel_size, activation, norm_2d, repeats)
 
     def forward(self, x, skip):
         x = self.up(x)
@@ -46,7 +46,7 @@ class UNet(nn.Module):
         
         self.out_channels = cfg["out_channels"]
         self.activation = cfg["activation"]
-        self.norm = cfg["norm"]
+        self.norm_2d = cfg["norm"]
         self.repeats = cfg["repeats"]
 
         self.channels = cfg["channels"]
@@ -65,7 +65,7 @@ class UNet(nn.Module):
                     self.kernel_size,
                     self.stride,
                     self.activation,
-                    self.norm,
+                    self.norm_2d,
                     self.repeats,
                 )
             )
@@ -77,7 +77,7 @@ class UNet(nn.Module):
             last_ch * 2,
             self.kernel_size,
             self.activation,
-            self.norm,
+            self.norm_2d,
             self.repeats,
         )
 
@@ -95,7 +95,7 @@ class UNet(nn.Module):
                     self.kernel_size,
                     self.stride,
                     self.activation,
-                    self.norm,
+                    self.norm_2d,
                     self.repeats,
                 )
             )
