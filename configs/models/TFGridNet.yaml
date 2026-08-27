@@ -1,0 +1,17 @@
+model:
+  model_name: TFGridNet
+
+  in_channels: 8
+  out_channels: 8
+  num_freqs: 513
+  emb_dim: 64
+  num_layers: 4
+  lstm_hidden_units: 256
+  emb_ks: 4
+  emb_hs: 1
+  attn_n_head: 4
+  attn_approx_qk_dim: 512
+  activation: prelu
+  dropout: 0.0
+  eps: 1.0e-5
+  normalize_input: true

@@ -17,11 +17,22 @@ class TrainingModule(pl.LightningModule):
         self.tcfg = cfg["training"]
         self.dcfg = cfg["data"]
 
+        configured_freqs = self.mcfg.get("num_freqs")
+        n_fft = self.dcfg.get("stft", {}).get("n_fft")
+        if configured_freqs is not None and n_fft is not None:
+            expected_freqs = int(n_fft) // 2 + 1
+            if int(configured_freqs) != expected_freqs:
+                raise ValueError(
+                    f"model.num_freqs={configured_freqs} does not match "
+                    f"data.stft.n_fft={n_fft} ({expected_freqs} bins)"
+                )
+
         self.model = MODELS[self.mcfg["model_name"]](self.mcfg).to(
             self.device, dtype=self.dtype
         )
 
-        self.masking_fn = MASKS[self.tcfg.get("masking", "complex")]
+        masking = self.tcfg.get("masking", "complex")
+        self.masking_fn = None if masking is None else MASKS[masking]
 
         self.lr = self.tcfg.get("lr", 1e-3)
         self.weight_decay = self.tcfg.get("weight_decay", 0.0)
@@ -47,7 +58,10 @@ class TrainingModule(pl.LightningModule):
         pred = self(x_complex)
         pred = channels_to_ri(pred)
 
-        y_hat = self.masking_fn(x, pred)
+        if self.masking_fn is None:
+            y_hat = pred.contiguous().to(dtype=x.dtype)
+        else:
+            y_hat = self.masking_fn(x, pred)
 
         loss = self.calculate_losses(y_hat, y, stage)
 
