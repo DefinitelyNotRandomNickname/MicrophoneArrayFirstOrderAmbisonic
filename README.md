@@ -3,10 +3,10 @@
 Project for estimating first-order ambisonic (FOA) signals from an
 irregular omnidirectional microphone-array input using deep learning.
 
-The current pipeline builds synthetic spatial samples from
-speech/noise WAV files and room impulse responses (RIRs), converts them to
-network features (STFT), and trains a PyTorch Lightning models to predict a complex mask
-that maps microphone-array spectrograms toward FOA WXYZ spectrograms.
+The current pipeline builds synthetic spatial samples from speech/noise WAV
+files and room impulse responses (RIRs), converts them to network features
+(STFT), and trains PyTorch Lightning models to predict either a complex mask or
+a direct complex mapping from microphone-array spectrograms to FOA WXYZ.
 
 ## What is included
 
@@ -112,7 +112,7 @@ This project is in early stage. With time, more DNN networks, augmentations, and
 Model roadmap:
 - [x] UNet,
 - [x] Conformer,
-- [ ] TF-GridNet,
+- [x] TF-GridNet,
 - [ ] Mamba,
 - [ ] DPRNN/DPTNet.
 
