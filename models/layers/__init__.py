@@ -1,5 +1,10 @@
 from models.layers.activations import get_activation
-from models.layers.convs import ConvBlock, SamePadDepthwiseConv1d, LocalTFConvBlock
+from models.layers.convs import (
+    CausalDepthwiseConv1d,
+    ConvBlock,
+    LocalTFConvBlock,
+    SamePadDepthwiseConv1d,
+)
 from models.layers.feedforwards import FeedForwardModule
 from models.layers.norms import (
     get_norm,
@@ -17,6 +22,7 @@ __all__ = [
     "get_norm_4d",
     "ConvBlock",
     "SamePadDepthwiseConv1d",
+    "CausalDepthwiseConv1d",
     "FeedForwardModule",
     "SinusoidalPositionalEncoding",
     "LocalTFConvBlock",

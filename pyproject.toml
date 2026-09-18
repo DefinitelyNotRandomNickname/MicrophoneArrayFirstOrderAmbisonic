@@ -43,6 +43,10 @@ dev = [
     "flake8>=5.0.0",
 ]
 
+cuda = [
+    "mamba-ssm>=2.3.2.post1",
+]
+
 [tool.setuptools.packages.find]
 where = ["."]
 include = ["data", "models", "projects", "utils"]

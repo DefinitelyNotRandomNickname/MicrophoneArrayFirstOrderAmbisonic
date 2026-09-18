@@ -2,7 +2,7 @@ import pytest
 import torch
 import torch.nn as nn
 
-from models.layers import get_norm_4d, get_activation
+from models.layers import CausalDepthwiseConv1d, get_activation, get_norm_4d
 
 
 @pytest.mark.parametrize(
@@ -38,7 +38,9 @@ def test_shared_activation_rejects_unknown_name():
 
 def test_channel_normalization_uses_channel_axis_only():
     normalization = get_norm_4d("layer", 4)
-    x = torch.randn(2, 4, 3, 5, requires_grad=True)
+    channel_values = torch.tensor([-3.0, -1.0, 1.0, 3.0]).view(1, 4, 1, 1)
+    spatial_offsets = torch.arange(2 * 3 * 5, dtype=torch.float32).view(2, 1, 3, 5)
+    x = (channel_values + spatial_offsets).requires_grad_()
 
     output = normalization(x)
     output.square().mean().backward()
@@ -79,3 +81,21 @@ def test_shared_normalizations_validate_tensor_shape():
         get_norm_4d("layer", 4)(torch.randn(2, 4, 5))
     with pytest.raises(ValueError, match="frequency bins"):
         get_norm_4d("layer_cf", 4, num_freqs=5)(torch.randn(2, 4, 3, 6))
+
+
+def test_causal_depthwise_conv_preserves_length_and_ignores_future():
+    conv = CausalDepthwiseConv1d(3, kernel_size=4)
+    x = torch.randn(2, 3, 9)
+    perturbed = x.clone()
+    perturbed[..., 5:] += 1.0
+
+    output = conv(x)
+
+    assert output.shape == x.shape
+    torch.testing.assert_close(conv(perturbed)[..., :5], output[..., :5])
+    assert not torch.allclose(conv(perturbed)[..., 5:], output[..., 5:])
+
+
+def test_causal_depthwise_conv_rejects_nonpositive_kernel():
+    with pytest.raises(ValueError, match="kernel_size"):
+        CausalDepthwiseConv1d(3, kernel_size=0)
