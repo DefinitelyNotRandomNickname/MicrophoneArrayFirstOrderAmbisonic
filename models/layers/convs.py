@@ -78,3 +78,29 @@ class LocalTFConvBlock(nn.Module):
 
     def forward(self, x):
         return x + self.net(x)
+
+
+class CausalDepthwiseConv1d(nn.Module):
+    """Depthwise 1D convolution that only sees the current and past positions.
+
+    Input/output: [B, C, L]
+    """
+
+    def __init__(self, channels, kernel_size, bias=True):
+        super().__init__()
+
+        if kernel_size < 1:
+            raise ValueError("kernel_size must be >= 1")
+
+        self.kernel_size = kernel_size
+        self.conv = nn.Conv1d(
+            channels,
+            channels,
+            kernel_size=kernel_size,
+            groups=channels,
+            bias=bias,
+        )
+
+    def forward(self, x):
+        x = F.pad(x, (self.kernel_size - 1, 0))
+        return self.conv(x)
