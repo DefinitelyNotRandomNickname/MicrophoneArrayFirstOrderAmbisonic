@@ -113,7 +113,7 @@ Model roadmap:
 - [x] UNet,
 - [x] Conformer,
 - [x] TF-GridNet,
-- [ ] Mamba,
+- [x] Mamba,
 - [ ] DPRNN/DPTNet.
 
 Input roadmap:
