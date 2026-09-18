@@ -110,21 +110,19 @@ def foa_energy_ratio_loss(
     FOA directional energy-ratio loss on WXYZ spectrograms.
 
     ratio_type:
-    - directional_to_total: sum(|XYZ|^2) / sum(|WXYZ|^2)
-    - directional_to_omni: sum(|XYZ|^2) / |W|^2
+    - directional_to_total: sqrt(sum(|XYZ|^2)) / (|W| * sqrt(sum(|XYZ|^2))
+    - directional_to_omni: sqrt(sum(|XYZ|^2)) / |W|
     """
     estimate = to_complex(estimate)
     target = to_complex(target)
 
-    estimate_w_energy = estimate[:, 0].abs().square()
-    target_w_energy = target[:, 0].abs().square()
-    estimate_xyz_energy = estimate[:, 1:4].abs().square().sum(dim=1)
-    target_xyz_energy = target[:, 1:4].abs().square().sum(dim=1)
+    estimate_w_energy = estimate[:, 0].abs()
+    target_w_energy = target[:, 0].abs()
+    estimate_xyz_energy = estimate[:, 1:4].abs().square().sum(dim=1).sqrt()
+    target_xyz_energy = target[:, 1:4].abs().square().sum(dim=1).sqrt()
 
     if ratio_type == "directional_to_total":
-        estimate_ratio = estimate_xyz_energy / (
-            estimate_w_energy + estimate_xyz_energy + eps
-        )
+        estimate_ratio = estimate_xyz_energy / (estimate_w_energy + estimate_xyz_energy + eps)
         target_ratio = target_xyz_energy / (target_w_energy + target_xyz_energy + eps)
     elif ratio_type == "directional_to_omni":
         estimate_ratio = estimate_xyz_energy / (estimate_w_energy + eps)
@@ -132,7 +130,9 @@ def foa_energy_ratio_loss(
     else:
         raise ValueError(f"Unsupported FOA energy ratio type: {ratio_type}")
 
-    loss = torch.abs(estimate_ratio - target_ratio)
+    estimate_log = torch.log(estimate_ratio + 1)
+    target_log = torch.log(target_ratio + 1)
+    loss = l1_loss(estimate_log, target_log, "none")
 
     weights = None
     if energy_weighting:

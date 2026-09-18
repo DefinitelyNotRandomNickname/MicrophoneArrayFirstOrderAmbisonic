@@ -31,7 +31,7 @@ training:
         energy_weighting: True
       foa_energy_ratio:
         weight: 1.0
-        ratio_type: directional_to_total
+        ratio_type: directional_to_omni
 
     wave_losses:
       multi_resolution_stft:
