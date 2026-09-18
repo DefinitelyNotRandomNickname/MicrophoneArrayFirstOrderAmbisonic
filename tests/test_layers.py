@@ -38,7 +38,9 @@ def test_shared_activation_rejects_unknown_name():
 
 def test_channel_normalization_uses_channel_axis_only():
     normalization = get_norm_4d("layer", 4)
-    x = torch.randn(2, 4, 3, 5, requires_grad=True)
+    channel_values = torch.tensor([-3.0, -1.0, 1.0, 3.0]).view(1, 4, 1, 1)
+    spatial_offsets = torch.arange(2 * 3 * 5, dtype=torch.float32).view(2, 1, 3, 5)
+    x = (channel_values + spatial_offsets).requires_grad_()
 
     output = normalization(x)
     output.square().mean().backward()
