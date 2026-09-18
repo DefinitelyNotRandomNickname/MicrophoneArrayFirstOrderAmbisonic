@@ -15,9 +15,13 @@ import math
 
 import torch
 
-from mamba_ssm.ops.selective_scan_interface import (
-    selective_scan_fn as _cuda_selective_scan,
-)
+try:
+    from mamba_ssm.ops.selective_scan_interface import (
+        selective_scan_fn as _cuda_selective_scan,
+    )
+except (ImportError, OSError):
+    # CPU-only fallback
+    _cuda_selective_scan = None
 
 SCAN_BACKENDS = ("auto", "torch", "cuda")
 
