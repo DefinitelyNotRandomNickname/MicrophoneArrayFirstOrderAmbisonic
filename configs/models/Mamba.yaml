@@ -1,0 +1,17 @@
+model:
+  model_name: Mamba
+
+  in_channels: 8
+  out_channels: 8
+  num_freqs: 513
+  emb_dim: 128
+  num_layers: 5
+  d_state: 32
+  d_conv: 4
+  expand: 2
+  dt_rank: auto
+  activation: silu
+  dropout: 0.0
+  eps: 1.0e-5
+  normalize_input: true
+  scan_backend: auto
