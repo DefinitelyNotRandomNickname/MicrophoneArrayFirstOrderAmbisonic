@@ -47,3 +47,19 @@ def test_tfgridnet_config_loads_and_model_is_registered():
     assert config["training"]["precision"] == 32
     assert config["training"]["masking"] is None
     assert "accumulate_grad_batches" not in config["training"]
+
+
+def test_mamba_config_loads_and_model_is_registered():
+    root = Path(__file__).parents[1]
+
+    config = load_and_merge_configs(
+        root / "configs" / "data" / "32khz.yaml",
+        root / "configs" / "models" / "Mamba.yaml",
+        root / "configs" / "training" / "base_mapping.yaml",
+    )
+
+    assert config["model"]["model_name"] == "Mamba"
+    assert config["model"]["dt_rank"] == "auto"
+    assert config["model"]["eps"] == pytest.approx(1e-5)
+    assert config["model"]["model_name"] in MODELS
+    assert config["training"]["masking"] is None
