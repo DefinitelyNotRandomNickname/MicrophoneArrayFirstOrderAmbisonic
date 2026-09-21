@@ -1,0 +1,22 @@
+model:
+  model_name: SpatialNet
+
+  in_channels: 8
+  out_channels: 8
+  num_freqs: 513
+  dim_hidden: 128
+  dim_squeeze: 8
+  num_layers: 8
+  num_heads: 4
+  ff_expansion_factor: 2
+  encoder_kernel_size: 5
+  freq_kernel_size: 5
+  time_kernel_size: 3
+  freq_conv_groups: 8
+  time_conv_groups: 8
+  share_full_band: true
+  activation: silu
+  conv_activation: prelu
+  dropout: 0.0
+  eps: 1.0e-5
+  normalize_input: true
