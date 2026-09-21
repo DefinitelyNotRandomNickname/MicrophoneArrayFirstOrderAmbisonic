@@ -2,10 +2,12 @@ from models.layers.activations import get_activation
 from models.layers.convs import (
     CausalDepthwiseConv1d,
     ConvBlock,
+    GroupedConvModule1d,
     LocalTFConvBlock,
     SamePadDepthwiseConv1d,
 )
-from models.layers.feedforwards import FeedForwardModule
+from models.layers.feedforwards import ConvFeedForwardModule, FeedForwardModule
+from models.layers.linears import GroupedLinear
 from models.layers.norms import (
     get_norm,
     get_norm_1d,
@@ -23,7 +25,10 @@ __all__ = [
     "ConvBlock",
     "SamePadDepthwiseConv1d",
     "CausalDepthwiseConv1d",
+    "GroupedConvModule1d",
     "FeedForwardModule",
+    "ConvFeedForwardModule",
+    "GroupedLinear",
     "SinusoidalPositionalEncoding",
     "LocalTFConvBlock",
 ]
