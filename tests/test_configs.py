@@ -63,3 +63,20 @@ def test_mamba_config_loads_and_model_is_registered():
     assert config["model"]["eps"] == pytest.approx(1e-5)
     assert config["model"]["model_name"] in MODELS
     assert config["training"]["masking"] is None
+
+
+def test_spatialnet_config_loads_and_model_is_registered():
+    root = Path(__file__).parents[1]
+
+    config = load_and_merge_configs(
+        root / "configs" / "data" / "32khz.yaml",
+        root / "configs" / "models" / "SpatialNet.yaml",
+        root / "configs" / "training" / "base_mapping.yaml",
+    )
+
+    assert config["model"]["model_name"] == "SpatialNet"
+    assert config["model"]["share_full_band"] is True
+    assert config["model"]["dim_squeeze"] == 8
+    assert config["model"]["eps"] == pytest.approx(1e-5)
+    assert config["model"]["model_name"] in MODELS
+    assert config["training"]["masking"] is None
