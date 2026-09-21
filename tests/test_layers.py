@@ -2,7 +2,14 @@ import pytest
 import torch
 import torch.nn as nn
 
-from models.layers import CausalDepthwiseConv1d, get_activation, get_norm_4d
+from models.layers import (
+    CausalDepthwiseConv1d,
+    ConvFeedForwardModule,
+    GroupedConvModule1d,
+    GroupedLinear,
+    get_activation,
+    get_norm_4d,
+)
 
 
 @pytest.mark.parametrize(
@@ -99,3 +106,90 @@ def test_causal_depthwise_conv_preserves_length_and_ignores_future():
 def test_causal_depthwise_conv_rejects_nonpositive_kernel():
     with pytest.raises(ValueError, match="kernel_size"):
         CausalDepthwiseConv1d(3, kernel_size=0)
+
+
+def test_grouped_linear_matches_independent_linear_layers():
+    torch.manual_seed(0)
+    grouped = GroupedLinear(5, 3, num_groups=4)
+    x = torch.randn(2, 7, 4, 5)
+
+    expected = torch.stack(
+        [
+            nn.functional.linear(
+                x[..., group, :], grouped.weight[group], grouped.bias[group]
+            )
+            for group in range(4)
+        ],
+        dim=-2,
+    )
+
+    torch.testing.assert_close(grouped(x), expected)
+    assert grouped(x).shape == (2, 7, 4, 3)
+
+
+def test_grouped_linear_initializes_like_linear_and_supports_no_bias():
+    grouped = GroupedLinear(16, 3, num_groups=2, bias=False)
+
+    assert grouped.bias is None
+    assert grouped.weight.abs().max() <= 0.25
+    assert grouped(torch.zeros(4, 2, 16)).abs().sum() == 0
+
+
+@pytest.mark.parametrize(
+    "x",
+    [torch.randn(5), torch.randn(2, 3, 5), torch.randn(2, 4, 6)],
+    ids=["rank", "groups", "features"],
+)
+def test_grouped_linear_rejects_mismatched_input(x):
+    grouped = GroupedLinear(5, 3, num_groups=4)
+
+    with pytest.raises(ValueError):
+        grouped(x)
+
+
+def test_grouped_linear_rejects_nonpositive_sizes():
+    with pytest.raises(ValueError):
+        GroupedLinear(5, 3, num_groups=0)
+
+
+@pytest.mark.parametrize("kernel_size", [1, 3], ids=["one", "odd"])
+def test_conv_feed_forward_module_preserves_shape(kernel_size):
+    module = ConvFeedForwardModule(8, 2, 0.0, "silu", kernel_size=kernel_size, groups=4)
+    x = torch.randn(2, 9, 8, requires_grad=True)
+
+    output = module(x)
+    output.square().mean().backward()
+
+    assert output.shape == x.shape
+    assert torch.isfinite(x.grad).all()
+
+
+def test_conv_feed_forward_module_validates_configuration():
+    with pytest.raises(ValueError, match="divisible"):
+        ConvFeedForwardModule(8, 2, 0.0, "silu", groups=3)
+    with pytest.raises(ValueError, match="kernel_size"):
+        ConvFeedForwardModule(8, 2, 0.0, "silu", kernel_size=0)
+    with pytest.raises(ValueError, match="\\[B, L, D\\]"):
+        ConvFeedForwardModule(8, 2, 0.0, "silu")(torch.randn(9, 8))
+
+
+@pytest.mark.parametrize("kernel_size", [1, 5], ids=["one", "odd"])
+def test_grouped_conv_module_preserves_shape(kernel_size):
+    module = GroupedConvModule1d(8, kernel_size, groups=2, activation="prelu")
+    x = torch.randn(2, 11, 8, requires_grad=True)
+
+    output = module(x)
+    output.square().mean().backward()
+
+    assert output.shape == x.shape
+    assert module.activation.num_parameters == 8
+    assert torch.isfinite(x.grad).all()
+
+
+def test_grouped_conv_module_validates_configuration():
+    with pytest.raises(ValueError, match="divisible"):
+        GroupedConvModule1d(8, 3, groups=3)
+    with pytest.raises(ValueError, match="kernel_size"):
+        GroupedConvModule1d(8, 0)
+    with pytest.raises(ValueError, match="\\[B, L, C\\]"):
+        GroupedConvModule1d(8, 3)(torch.randn(2, 8))
