@@ -114,7 +114,7 @@ Model roadmap:
 - [x] Conformer,
 - [x] TF-GridNet,
 - [x] Mamba,
-- [ ] DPRNN/DPTNet.
+- [x] SpatialNet.
 
 Input roadmap:
 - [x] STFT,
