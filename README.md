@@ -56,9 +56,9 @@ The full dependency list is declared in `pyproject.toml`.
 
 Training merges three YAML files:
 
-- `configs/data/32khz.yaml`
-- `configs/models/UNet.yaml`
-- `configs/training/base.yaml`
+- Data config,
+- Model config,
+- Training config.
 
 The model config defines network model and layout. The base
 training config sets Lightning trainer options, optimizer settings, a
@@ -82,7 +82,7 @@ Or call the training entry point directly:
 ```bash
 python projects/train.py \
   --data_cfg configs/data/32khz.yaml \
-  --model_cfg configs/models/UNet.yaml \
+  --model_cfg configs/models/unet/UNet.yaml \
   --train_cfg configs/training/base.yaml \
   --exp_name UNet_base_32khz \
   --log_dir .logs
@@ -118,9 +118,10 @@ Model roadmap:
 
 Input roadmap:
 - [x] STFT,
-- [ ] wave,
-- [ ] HTT,
-- [ ] IPD/ILD.
+- [x] Geometry/ATF-conditioned FOA prior,
+- [ ] Pairwise PHAT/IPD (optionally ILD),
+- [ ] Local spatial convariance/coherence,
+- [ ] Spherical SRP-PHAT map.
 
 ## Notes
 
