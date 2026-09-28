@@ -10,7 +10,13 @@ data:
   noise_paths:
   - /data/soundsource/noise32k/DNS_noise_fullband
 
+  # Environment noise
   snr_db: [-10, 10]
+  noise_in_target: true
+
+  # Electrical noise
+  self_noise_db: [20, 45]
+
   max_len: 1e4
 
   stft:
