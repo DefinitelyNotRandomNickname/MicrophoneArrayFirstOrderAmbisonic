@@ -50,6 +50,7 @@ class UNet(nn.Module):
         self.repeats = cfg["repeats"]
 
         self.channels = cfg["channels"]
+        self.in_channels = self.channels[0][0]
 
         self.kernel_size = cfg.get("kernel_size", 3)
         self.stride = cfg.get("stride", 2)
@@ -103,6 +104,13 @@ class UNet(nn.Module):
 
         # Output
         self.final_conv = nn.Conv2d(in_ch, self.out_channels, kernel_size=1)
+
+        # A near-zero head makes the network start as the identity on whatever
+        # it is added to, e.g. the FOA prior in residual mode.
+        output_init_std = cfg.get("output_init_std")
+        if output_init_std is not None:
+            nn.init.normal_(self.final_conv.weight, mean=0.0, std=output_init_std)
+            nn.init.zeros_(self.final_conv.bias)
 
     def forward(self, x):
         skips = []
