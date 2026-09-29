@@ -164,11 +164,11 @@ class TrainingModule(pl.LightningModule):
             loss_val = loss_fn(estimate, target, **loss_params)
             total_loss += loss_val * loss_params["weight"]
             self.log(
-                f"{stage}_{prefix}{loss}_loss", loss_val, prog_bar=True, on_epoch=True
+                f"{stage}_{loss}_loss", loss_val, prog_bar=True, on_epoch=True
             )
 
         self.log(
-            f"{stage}_{prefix}total_loss", total_loss, prog_bar=True, on_epoch=True
+            f"{stage}_total_loss", total_loss, prog_bar=True, on_epoch=True
         )
 
         return total_loss
