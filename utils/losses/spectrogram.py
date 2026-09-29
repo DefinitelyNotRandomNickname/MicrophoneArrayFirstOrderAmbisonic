@@ -5,10 +5,10 @@ from utils.audio import compute_stft
 from utils.complex import split_complex, to_complex
 from utils.losses.utils import reduce_loss, weighted_reduce_loss
 
-
 # -----------------------------
 # L1
 # -----------------------------
+
 
 def l1_loss(estimate, target, reduction="mean", **kwargs):
     return F.l1_loss(estimate, target, reduction=reduction)
@@ -17,6 +17,7 @@ def l1_loss(estimate, target, reduction="mean", **kwargs):
 # -----------------------------
 # Magnitude
 # -----------------------------
+
 
 def _magnitude(x, eps=1e-8):
     xr, xi = split_complex(x)
@@ -32,6 +33,7 @@ def magnitude_loss(estimate, target, eps=1e-8, **kwargs):
 # -----------------------------
 # DOA from FOA active-intensity loss
 # -----------------------------
+
 
 def _foa_energy(x, dim=1):
     return x.abs().square().sum(dim=dim)
@@ -74,8 +76,8 @@ def foa_active_intensity_doa_loss(
 
     if sim_dim > 1:
         b, c, t, f = estimate_dir.shape
-        estimate_dir = estimate_dir.view(b, c, t*f)
-        target_dir = target_dir.view(b, c, t*f)
+        estimate_dir = estimate_dir.view(b, c, t * f)
+        target_dir = target_dir.view(b, c, t * f)
 
     if doa_method == "cosine_sim":
         c_sim = torch.nn.CosineSimilarity(dim=sim_dim)
@@ -87,7 +89,9 @@ def foa_active_intensity_doa_loss(
 
     weights = None
     if energy_weighting:
-        weights = _energy_weights(target, power=energy_weight_power, eps=eps, dim=sim_dim)
+        weights = _energy_weights(
+            target, power=energy_weight_power, eps=eps, dim=sim_dim
+        )
 
     return weighted_reduce_loss(loss, weights=weights, reduction=reduction, eps=eps)
 
@@ -95,6 +99,7 @@ def foa_active_intensity_doa_loss(
 # -----------------------------
 # FOA energy-ratio loss
 # -----------------------------
+
 
 def foa_energy_ratio_loss(
     estimate,
@@ -110,7 +115,7 @@ def foa_energy_ratio_loss(
     FOA directional energy-ratio loss on WXYZ spectrograms.
 
     ratio_type:
-    - directional_to_total: sqrt(sum(|XYZ|^2)) / (|W| * sqrt(sum(|XYZ|^2))
+    - directional_to_total: |XYZ| / (|W| + |XYZ|)
     - directional_to_omni: sqrt(sum(|XYZ|^2)) / |W|
     """
     estimate = to_complex(estimate)
@@ -118,11 +123,14 @@ def foa_energy_ratio_loss(
 
     estimate_w_energy = estimate[:, 0].abs()
     target_w_energy = target[:, 0].abs()
-    estimate_xyz_energy = estimate[:, 1:4].abs().square().sum(dim=1).sqrt()
-    target_xyz_energy = target[:, 1:4].abs().square().sum(dim=1).sqrt()
+
+    estimate_xyz_energy = torch.linalg.vector_norm(estimate[:, 1:4], ord=2, dim=1)
+    target_xyz_energy = torch.linalg.vector_norm(target[:, 1:4], ord=2, dim=1)
 
     if ratio_type == "directional_to_total":
-        estimate_ratio = estimate_xyz_energy / (estimate_w_energy + estimate_xyz_energy + eps)
+        estimate_ratio = estimate_xyz_energy / (
+            estimate_w_energy + estimate_xyz_energy + eps
+        )
         target_ratio = target_xyz_energy / (target_w_energy + target_xyz_energy + eps)
     elif ratio_type == "directional_to_omni":
         estimate_ratio = estimate_xyz_energy / (estimate_w_energy + eps)
@@ -130,8 +138,8 @@ def foa_energy_ratio_loss(
     else:
         raise ValueError(f"Unsupported FOA energy ratio type: {ratio_type}")
 
-    estimate_log = torch.log(estimate_ratio + 1)
-    target_log = torch.log(target_ratio + 1)
+    estimate_log = torch.log1p(estimate_ratio)
+    target_log = torch.log1p(target_ratio)
     loss = l1_loss(estimate_log, target_log, "none")
 
     weights = None
@@ -145,6 +153,7 @@ def foa_energy_ratio_loss(
 # Spectral convergence loss
 # -----------------------------
 
+
 def spectral_convergence_loss(estimate_mag, target_mag, eps=1e-8, reduction="mean"):
     diff = torch.linalg.vector_norm(target_mag - estimate_mag, ord=2, dim=(-2, -1))
     denom = torch.linalg.vector_norm(target_mag, ord=2, dim=(-2, -1)).clamp_min(eps)
@@ -157,6 +166,7 @@ def spectral_convergence_loss(estimate_mag, target_mag, eps=1e-8, reduction="mea
 # Multi resolution STFT loss
 # -----------------------------
 
+
 def _normalize_resolutions(fft_sizes=None, hop_sizes=None, win_lengths=None):
     if fft_sizes is None:
         fft_sizes = [512, 1024, 2048]
@@ -166,7 +176,9 @@ def _normalize_resolutions(fft_sizes=None, hop_sizes=None, win_lengths=None):
         win_lengths = fft_sizes
 
     if not (len(fft_sizes) == len(hop_sizes) == len(win_lengths)):
-        raise ValueError("fft_sizes, hop_sizes, and win_lengths must have the same length")
+        raise ValueError(
+            "fft_sizes, hop_sizes, and win_lengths must have the same length"
+        )
 
     return [
         (int(n_fft), int(hop_length), int(win_length))
@@ -194,7 +206,9 @@ def multi_resolution_stft_loss(
     and log-magnitude L1 across all configured STFT resolutions.
     """
     if reduction not in ("mean", "sum"):
-        raise ValueError("multi_resolution_stft_loss supports reduction: 'mean' or 'sum'")
+        raise ValueError(
+            "multi_resolution_stft_loss supports reduction: 'mean' or 'sum'"
+        )
 
     stft_resolutions = _normalize_resolutions(
         fft_sizes=fft_sizes,

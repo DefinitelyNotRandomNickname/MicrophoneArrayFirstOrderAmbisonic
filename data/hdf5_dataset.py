@@ -18,11 +18,17 @@ class SpatialAudioDataset(Dataset):
 
         dcfg = cfg["data"]
 
-        self.rir_file = h5py.File(rir_path, "r")
-        self.rir_mems = self.rir_file["rir/mems"]
-        self.rir_foa = self.rir_file["rir/foa"]
-        self.meta = self._load_meta()
-        print(self.meta)
+        self.rir_path = rir_path
+        self.rir_file = None
+        self.rir_mems = None
+        self.rir_foa = None
+        self._rir_owner_pid = None
+
+        with h5py.File(self.rir_path, "r") as rir_file:
+            self.num_rirs = int(rir_file["rir/mems"].shape[0])
+            self.rir_slots = int(rir_file["rir/mems"].shape[1])
+            self.num_mics = int(rir_file["rir/mems"].shape[2])
+            self.meta = self._load_meta(rir_file)
 
         self.audio_paths = self._collect_wavs(dcfg["audio_paths"])
         self.noise_paths = self._collect_wavs(dcfg.get("noise_paths", []))
@@ -44,8 +50,6 @@ class SpatialAudioDataset(Dataset):
         # MEMS electrical self-noise
         self.self_noise_db = dcfg.get("self_noise_db", None)
 
-        self.rir_slots = int(self.rir_mems.shape[1])
-        self.num_mics = int(self.rir_mems.shape[2])
         self.max_speech_sources = min(self.num_sources, self.rir_slots)
 
         # Noise source
@@ -65,14 +69,45 @@ class SpatialAudioDataset(Dataset):
     def __len__(self):
         return self.max_len
 
-    def _load_meta(self):
+    def _load_meta(self, rir_file):
         """Per-RIR simulation metadata (room, positions)."""
-        raw = self.rir_file["meta/json"][()]
+        raw = rir_file["meta/json"][()]
 
         if isinstance(raw, bytes):
             raw = raw.decode("utf-8")
 
         return json.loads(raw)
+
+    def _ensure_rir_file(self):
+        """Open an independent HDF5 handle in the current worker process."""
+        current_pid = os.getpid()
+        if self.rir_file is not None and self._rir_owner_pid == current_pid:
+            return
+
+        if self.rir_file is not None:
+            self.rir_file.close()
+
+        self.rir_file = h5py.File(self.rir_path, "r")
+        self.rir_mems = self.rir_file["rir/mems"]
+        self.rir_foa = self.rir_file["rir/foa"]
+        self._rir_owner_pid = current_pid
+
+    def __getstate__(self):
+        state = self.__dict__.copy()
+        state["rir_file"] = None
+        state["rir_mems"] = None
+        state["rir_foa"] = None
+        state["_rir_owner_pid"] = None
+        return state
+
+    def __del__(self):
+        rir_file = getattr(self, "rir_file", None)
+        if rir_file is not None:
+            try:
+                rir_file.close()
+            except (AttributeError, RuntimeError):
+                # Module teardown can invalidate h5py before Dataset cleanup.
+                pass
 
     def _build_feature(self, dcfg, name):
         """
@@ -95,9 +130,7 @@ class SpatialAudioDataset(Dataset):
         Static geometry is may be more or less useful during actual inference
         depending on the array.
         """
-        positions, key = self.foa_prior.positions_for(
-            self.meta, rir_idx, self.num_mics
-        )
+        positions, key = self.foa_prior.positions_for(self.meta, rir_idx, self.num_mics)
 
         return positions, rir_idx if key is None else key
 
@@ -125,11 +158,14 @@ class SpatialAudioDataset(Dataset):
         # TODO: up/down sample
         assert sr == self.sr
 
+        if not np.isfinite(audio).all():
+            raise ValueError(f"Non-finite sample found in audio file: {path}")
+
         if len(audio) < self.segment_samples:
             audio = np.pad(audio, (0, self.segment_samples - len(audio)))
         else:
             start = random.randint(0, len(audio) - self.segment_samples)
-            audio = audio[start:start + self.segment_samples]
+            audio = audio[start : start + self.segment_samples]
 
         return audio.astype(np.float32)
 
@@ -185,27 +221,34 @@ class SpatialAudioDataset(Dataset):
 
     def __getitem__(self, idx):
 
+        self._ensure_rir_file()
+
         # Get audio sources
         sources = self._get_sources()
 
         # Sample RIRs
-        rir_idx = random.randint(0, len(self.rir_mems) - 1)
+        rir_idx = random.randint(0, self.num_rirs - 1)
         mems_rirs = self.rir_mems[rir_idx]  # (num_sources, 4, rir_length)
-        foa_rirs = self.rir_foa[rir_idx]    # (num_sources, 4, rir_length)
+        foa_rirs = self.rir_foa[rir_idx]  # (num_sources, 4, rir_length)
+
+        if not np.isfinite(mems_rirs).all() or not np.isfinite(foa_rirs).all():
+            raise ValueError(
+                f"Non-finite RIR data at dataset index {idx}, RIR index {rir_idx}"
+            )
 
         # Convolve each source with its corresponding RIRs and mix
         mems = None
         foa = None
-        
+
         for src_idx, source in enumerate(sources):
             # Get RIRs for this source
             mems_rir = mems_rirs[src_idx]  # (4, rir_length)
-            foa_rir = foa_rirs[src_idx]    # (4, rir_length)
-            
+            foa_rir = foa_rirs[src_idx]  # (4, rir_length)
+
             # Convolve source with its RIRs
             src_mems = fft_convolve(source, mems_rir)
             src_foa = fft_convolve(source, foa_rir)
-            
+
             # Add to mix
             if mems is None:
                 mems = src_mems
@@ -228,6 +271,12 @@ class SpatialAudioDataset(Dataset):
 
         mems = mems + self._self_noise(mems)
 
+        if not np.isfinite(mems).all() or not np.isfinite(foa).all():
+            raise ValueError(
+                "Augmentation produced non-finite audio at "
+                f"dataset index {idx}, RIR index {rir_idx}"
+            )
+
         # Peak-Norm
         if self.normalize:
             max_val = max(np.abs(mems).max(), np.abs(foa).max(), 1e-6)
@@ -238,10 +287,22 @@ class SpatialAudioDataset(Dataset):
         mems_spec = compute_stft(mems, self.n_fft, self.hop, self.win, self.window)
         foa_spec = compute_stft(foa, self.n_fft, self.hop, self.win, self.window)
 
+        if not torch.isfinite(mems_spec).all() or not torch.isfinite(foa_spec).all():
+            raise ValueError(
+                "STFT produced non-finite data at "
+                f"dataset index {idx}, RIR index {rir_idx}"
+            )
+
         if self.foa_prior is None:
             return mems_spec, foa_spec
 
         positions, key = self._prior_geometry(rir_idx)
         prior_spec = self.foa_prior(mems_spec, positions, key=key)
+
+        if not torch.isfinite(prior_spec).all():
+            raise ValueError(
+                "FOA prior produced non-finite data at "
+                f"dataset index {idx}, RIR index {rir_idx}"
+            )
 
         return mems_spec, foa_spec, prior_spec

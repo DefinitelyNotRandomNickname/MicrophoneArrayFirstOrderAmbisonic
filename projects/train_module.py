@@ -8,7 +8,6 @@ from utils.losses import SPECTROGRAM_LOSSES, WAVE_LOSSES
 from utils.masking import MASKS
 from projects.schedulers import build_lr_scheduler
 
-
 # How the network output is combined with the geometry/ATF FOA prior:
 #   none        the prior is only an extra input feature
 #   residual    the network predicts a correction added to the prior
@@ -146,15 +145,23 @@ class TrainingModule(pl.LightningModule):
         self._step(batch, stage="val")
 
     def calculate_losses(self, estimate, target, stage):
-        total_loss = 0.0
+        with torch.autocast(device_type=estimate.device.type, enabled=False):
+            estimate = estimate.to(
+                dtype=torch.complex64 if estimate.is_complex() else torch.float32
+            )
+            target = target.to(
+                dtype=torch.complex64 if target.is_complex() else torch.float32
+            )
+            return self._calculate_losses(estimate, target, stage)
+
+    def _calculate_losses(self, estimate, target, stage):
+        total_loss = estimate.real.new_tensor(0.0)
 
         for loss, loss_params in self.stft_losses.items():
             loss_fn = SPECTROGRAM_LOSSES[loss]
             loss_val = loss_fn(estimate, target, **loss_params)
             total_loss += loss_val * loss_params["weight"]
-            self.log(
-                f"{stage}_{loss}_loss", loss_val, prog_bar=True, on_epoch=True
-            )
+            self.log(f"{stage}_{loss}_loss", loss_val, prog_bar=True, on_epoch=True)
 
         estimate = istft_from_spectrogram(estimate, **self.dcfg["stft"])
         target = istft_from_spectrogram(target, **self.dcfg["stft"])
@@ -163,13 +170,9 @@ class TrainingModule(pl.LightningModule):
             loss_fn = WAVE_LOSSES[loss]
             loss_val = loss_fn(estimate, target, **loss_params)
             total_loss += loss_val * loss_params["weight"]
-            self.log(
-                f"{stage}_{loss}_loss", loss_val, prog_bar=True, on_epoch=True
-            )
+            self.log(f"{stage}_{loss}_loss", loss_val, prog_bar=True, on_epoch=True)
 
-        self.log(
-            f"{stage}_total_loss", total_loss, prog_bar=True, on_epoch=True
-        )
+        self.log(f"{stage}_total_loss", total_loss, prog_bar=True, on_epoch=True)
 
         return total_loss
 
@@ -187,8 +190,3 @@ class TrainingModule(pl.LightningModule):
             "optimizer": optimizer,
             "lr_scheduler": build_lr_scheduler(optimizer, sched_cfg, self),
         }
-
-    def on_before_optimizer_step(self, optimizer):
-        clip_val = self.tcfg.get("grad_clip_val", None)
-        if clip_val is not None:
-            torch.nn.utils.clip_grad_norm_(self.parameters(), clip_val)
