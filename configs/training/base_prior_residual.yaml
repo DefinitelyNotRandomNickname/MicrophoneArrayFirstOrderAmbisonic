@@ -46,5 +46,9 @@ training:
         normalize: fro
         loss_type: l1
 
+  # prior + model output.
   masking:
+  prior_combine: residual
+  prior_as_input: true
+  log_prior_baseline: false
   compile: true
