@@ -161,7 +161,14 @@ class TrainingModule(pl.LightningModule):
             loss_fn = SPECTROGRAM_LOSSES[loss]
             loss_val = loss_fn(estimate, target, **loss_params)
             total_loss += loss_val * loss_params["weight"]
-            self.log(f"{stage}_{loss}_loss", loss_val, prog_bar=True, on_epoch=True)
+            self.log(
+                f"{stage}_{loss}_loss",
+                loss_val,
+                prog_bar=True,
+                on_epoch=True,
+                sync_dist=True,
+                batch_size=target.size(0),
+            )
 
         estimate = istft_from_spectrogram(estimate, **self.dcfg["stft"])
         target = istft_from_spectrogram(target, **self.dcfg["stft"])
@@ -170,9 +177,23 @@ class TrainingModule(pl.LightningModule):
             loss_fn = WAVE_LOSSES[loss]
             loss_val = loss_fn(estimate, target, **loss_params)
             total_loss += loss_val * loss_params["weight"]
-            self.log(f"{stage}_{loss}_loss", loss_val, prog_bar=True, on_epoch=True)
+            self.log(
+                f"{stage}_{loss}_loss",
+                loss_val,
+                prog_bar=True,
+                on_epoch=True,
+                sync_dist=True,
+                batch_size=target.size(0),
+            )
 
-        self.log(f"{stage}_total_loss", total_loss, prog_bar=True, on_epoch=True)
+        self.log(
+            f"{stage}_total_loss",
+            total_loss,
+            prog_bar=True,
+            on_epoch=True,
+            sync_dist=True,
+            batch_size=target.size(0),
+        )
 
         return total_loss
 
