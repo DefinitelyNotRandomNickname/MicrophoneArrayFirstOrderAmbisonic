@@ -302,8 +302,9 @@ class TFGridNet(nn.Module):
 
         scale = None
         if self.normalize_input:
-            scale = x.square().mean(dim=(1, 2, 3), keepdim=True).sqrt()
-            scale = scale.clamp_min(self.eps)
+            scale = (
+                x.square().mean(dim=(1,2,3), keepdim=True) + self.eps**2
+            ).sqrt()
             x = x / scale
 
         x = x.transpose(2, 3).contiguous()
