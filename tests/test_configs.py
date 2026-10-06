@@ -22,7 +22,7 @@ def test_project_configs_load_and_parse_scientific_notation():
     root = Path(__file__).parents[1]
 
     config = load_and_merge_configs(
-        root / "configs" / "data" / "32khz.yaml",
+        root / "configs" / "data" / "tetra" / "32khz.yaml",
         root / "configs" / "models" / "unet" / "UNet.yaml",
         root / "configs" / "training" / "base.yaml",
     )
@@ -36,7 +36,7 @@ def test_tfgridnet_config_loads_and_model_is_registered():
     root = Path(__file__).parents[1]
 
     config = load_and_merge_configs(
-        root / "configs" / "data" / "32khz.yaml",
+        root / "configs" / "data" / "tetra" / "32khz.yaml",
         root / "configs" / "models" / "tfgridnet" / "TFGridNet.yaml",
         root / "configs" / "training" / "base_mapping.yaml",
     )
@@ -54,7 +54,7 @@ def test_mamba_config_loads_and_model_is_registered():
     root = Path(__file__).parents[1]
 
     config = load_and_merge_configs(
-        root / "configs" / "data" / "32khz.yaml",
+        root / "configs" / "data" / "tetra" / "32khz.yaml",
         root / "configs" / "models" / "mamba" / "Mamba.yaml",
         root / "configs" / "training" / "base_mapping.yaml",
     )
@@ -70,7 +70,7 @@ def test_spatialnet_config_loads_and_model_is_registered():
     root = Path(__file__).parents[1]
 
     config = load_and_merge_configs(
-        root / "configs" / "data" / "32khz.yaml",
+        root / "configs" / "data" / "tetra" / "32khz.yaml",
         root / "configs" / "models" / "spatialnet" / "SpatialNet.yaml",
         root / "configs" / "training" / "base_mapping.yaml",
     )
@@ -87,7 +87,7 @@ def test_conformer_foa_prior_experiment_configs_are_consistent():
     root = Path(__file__).parents[1]
 
     config = load_and_merge_configs(
-        root / "configs" / "data" / "32khz_foa_prior.yaml",
+        root / "configs" / "data" / "tetra" / "32khz_foa_prior.yaml",
         root / "configs" / "models" / "conformer" / "Conformer_foa_prior.yaml",
         root / "configs" / "training" / "base_prior_residual.yaml",
     )
@@ -113,7 +113,7 @@ def test_unet_foa_prior_experiment_configs_are_consistent():
     root = Path(__file__).parents[1]
 
     config = load_and_merge_configs(
-        root / "configs" / "data" / "32khz_foa_prior.yaml",
+        root / "configs" / "data" / "tetra" / "32khz_foa_prior.yaml",
         root / "configs" / "models" / "unet" / "UNet_foa_prior.yaml",
         root / "configs" / "training" / "base_prior_residual.yaml",
     )
