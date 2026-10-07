@@ -57,6 +57,7 @@ import numpy as np
 import torch
 
 from utils.complex import to_complex
+from utils.features.base import SpectralFeature, residual_prediction
 
 SOUND_SPEED = 343.0
 LAYOUT_KEY = "mic_array_layout"
@@ -250,7 +251,7 @@ def nominal_mic_positions(meta, num_mics):
     return np.mean(offsets, axis=0)
 
 
-class AtfFoaPrior:
+class AtfFoaPrior(SpectralFeature):
     """
     Config-driven wrapper that builds and caches LS Ambisonic encoders.
 
@@ -266,8 +267,36 @@ class AtfFoaPrior:
         cache_size:      number of encoders kept in memory
     """
 
-    def __init__(self, cfg, n_fft, sr):
-        cfg = cfg or {}
+    name = "atf_foa_prior"
+
+    def __init__(
+        self,
+        cfg,
+        n_fft,
+        sr,
+        num_mics=4,
+    ):
+        cfg = dict(cfg or {})
+
+        super().__init__(
+            cfg,
+            n_fft=n_fft,
+            sr=sr,
+            num_mics=num_mics,
+        )
+
+        self.output_mode = cfg.get("output_mode", "none")
+        prediction_hooks = {
+            "none": self._keep_prediction_context,
+            "residual": self._use_as_residual,
+            "mask": self._use_as_mask_reference,
+        }
+        if self.output_mode not in prediction_hooks:
+            raise ValueError(
+                f"Unknown atf_foa_prior.output_mode '{self.output_mode}'; "
+                f"expected one of {sorted(prediction_hooks)}"
+            )
+        self._prediction_hook = prediction_hooks[self.output_mode]
 
         self.geometry_source = cfg.get("geometry_source", "actual")
         if self.geometry_source not in ("actual", "nominal"):
@@ -292,8 +321,45 @@ class AtfFoaPrior:
         self._cache = OrderedDict()
 
     @property
-    def num_channels(self):
+    def feature_channels(self):
         return 4
+
+    def dataset_hook(self, mic_spec, *, meta, rir_idx, num_mics, **context):
+        """Dataset hook that selects the sample geometry and encodes WXYZ."""
+        del context
+        positions, key = self.positions_for(meta, rir_idx, num_mics)
+        if key is None:
+            key = rir_idx
+        return self(mic_spec, positions, key=key)
+
+    @staticmethod
+    def _keep_prediction_context(context, value):
+        del value
+        return context
+
+    def _use_as_residual(self, context, value):
+        return context.replace(
+            owner=self.name,
+            reference=value,
+            combine=residual_prediction,
+        )
+
+    def _use_as_mask_reference(self, context, value):
+        return context.replace(
+            owner=self.name,
+            reference=value,
+            combine=context.masking_fn,
+        )
+
+    def prediction_hook(self, context, value):
+        return self._prediction_hook(context, value)
+
+    def validate_model(self, masking_fn):
+        if self.output_mode == "mask" and masking_fn is None:
+            raise ValueError(
+                "data.features.atf_foa_prior.output_mode='mask' needs "
+                "training.masking to be set"
+            )
 
     def nominal_positions(self, meta, num_mics):
         """
