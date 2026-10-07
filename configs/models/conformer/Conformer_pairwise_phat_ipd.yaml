@@ -1,0 +1,16 @@
+model:
+  model_name: Conformer
+
+  # 4 microphone complex channels + 6 pairwise complex PHAT/IPD channels.
+  in_channels: 20
+  out_channels: 8
+  num_freqs: 513
+  tf_channels: 256
+  num_layers: 4
+  num_heads: 8
+  ff_expansion_factor: 2
+  conv_kernel_size: 31
+  dropout: 0.1
+  activation: silu
+  rnn_hidden: 128
+  add_identity_mask: false

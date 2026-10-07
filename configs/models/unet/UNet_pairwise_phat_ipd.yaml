@@ -1,0 +1,16 @@
+model:
+  model_name: UNet
+
+  out_channels: 8
+  repeats: 2
+  # 4 microphone complex channels + 6 pairwise complex PHAT/IPD channels.
+  channels:
+  - [20, 32]
+  - [32, 64]
+  - [64, 128]
+  - [128, 256]
+  kernel_size: 3
+  stride: 2
+
+  norm: batch
+  activation: leaky_relu

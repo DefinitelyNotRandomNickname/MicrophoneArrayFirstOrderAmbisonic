@@ -1,6 +1,7 @@
 data:
   seconds: 3.0
   sr: 32000
+  num_mics: 4
   num_sources: 6
 
   train_rir_path: tmp/train_rir_dataset_tetrahedron_32000hz_3.0s.h5
@@ -28,10 +29,8 @@ data:
 
   features:
     atf_foa_prior:
-      enabled: true
-
+      output_mode: residual
       geometry_source: actual
-
       num_directions: 256
       sound_speed: 343.0
       reg_eps: 1.0e-3

@@ -24,5 +24,10 @@ data:
     n_fft: 1024
     hop_length: 256   # 75% overlap
     win_length: 1024
-  
-  normalize: True
+
+  normalize: true
+
+  features:
+    pairwise_phat_ipd:
+      pairs: all
+      eps: 1.0e-8
