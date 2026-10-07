@@ -93,12 +93,11 @@ def test_conformer_foa_prior_experiment_configs_are_consistent():
 
     prior = config["data"]["features"]["atf_foa_prior"]
 
-    assert prior["enabled"] is True
     assert prior["geometry_source"] == "actual"
     assert prior["reg_eps"] == pytest.approx(1e-3)
     assert prior["max_wng_db"] == pytest.approx(20.0)
 
-    assert config["training"]["prior_combine"] == "residual"
+    assert prior["output_mode"] == "residual"
     assert config["training"]["masking"] is None
 
     # 4 microphones plus the 4 prior channels, real and imaginary.
@@ -120,7 +119,33 @@ def test_unet_foa_prior_experiment_configs_are_consistent():
     # UNet takes its input width from the first channel pair.
     assert config["model"]["channels"][0][0] == 16
     assert config["model"]["output_init_std"] == pytest.approx(1e-3)
-    assert config["training"]["prior_combine"] == "residual"
+    assert config["data"]["features"]["atf_foa_prior"]["output_mode"] == "residual"
 
     module = TrainingModule(config)
     assert module.model.in_channels == 16
+
+
+@pytest.mark.parametrize(
+    ("model_dir", "model_file"),
+    [
+        ("conformer", "Conformer_pairwise_phat_ipd.yaml"),
+        ("mamba", "Mamba_pairwise_phat_ipd.yaml"),
+        ("spatialnet", "SpatialNet_pairwise_phat_ipd.yaml"),
+        ("tfgridnet", "TFGridNet_pairwise_phat_ipd.yaml"),
+        ("unet", "UNet_pairwise_phat_ipd.yaml"),
+    ],
+)
+def test_pairwise_phat_ipd_configs_are_available_for_every_model(model_dir, model_file):
+    root = Path(__file__).parents[1]
+    config = load_and_merge_configs(
+        root / "configs" / "data" / "tetra" / "32khz_pairwise_phat_ipd.yaml",
+        root / "configs" / "models" / model_dir / model_file,
+        root / "configs" / "training" / "base_mapping.yaml",
+    )
+
+    feature = config["data"]["features"]["pairwise_phat_ipd"]
+    assert feature["pairs"] == "all"
+
+    module = TrainingModule(config)
+    assert module.model.in_channels == 20
+    assert module.feature_hooks.input_channels == 12

@@ -2,7 +2,7 @@ import torch
 import torch.nn as nn
 
 from projects.train_module import TrainingModule
-from utils.complex import channels_to_ri
+from utils.complex import channels_to_ri, ri_to_channels
 from utils.masking import complex_mask_apply
 
 _OMIT_MASKING = object()
@@ -41,7 +41,7 @@ class FixedPrediction(nn.Module):
         return self.prediction.expand(x.size(0), -1, -1, -1)
 
 
-def _capture_step_estimate(module, x, prediction):
+def _capture_step_estimate(module, x, prediction, features=None):
     captured = {}
     module.model = FixedPrediction(prediction)
 
@@ -52,7 +52,8 @@ def _capture_step_estimate(module, x, prediction):
 
     module.calculate_losses = capture_loss
     target = torch.zeros_like(x)
-    module._step((x, target), stage="train")
+    batch = (x, target) if features is None else (x, target, features)
+    module._step(batch, stage="train")
     return captured
 
 
@@ -70,7 +71,7 @@ def test_mapping_mode_uses_model_output_as_direct_foa_estimate():
     assert captured["stage"] == "train"
 
 
-def test_omitted_masking_defaults_to_legacy_complex_masking():
+def test_omitted_masking_defaults_to_complex_masking():
     module = TrainingModule(_training_config(_OMIT_MASKING))
     x = torch.randn(2, 4, 17, 9, 2)
     prediction = torch.randn(1, 8, 17, 9)
@@ -127,6 +128,50 @@ def test_mapping_mode_runs_real_foa_and_wave_losses_backward():
     ]
     assert gradients
     assert all(torch.isfinite(gradient).all() for gradient in gradients)
+
+
+def test_foa_prior_prediction_hook_adds_residual_without_training_branches():
+    config = _training_config(None)
+    config["model"]["in_channels"] = 16
+    config["data"]["features"] = {"atf_foa_prior": {"output_mode": "residual"}}
+    module = TrainingModule(config)
+    x = torch.randn(2, 4, 17, 9, 2)
+    prior = torch.randn_like(x)
+    prediction = torch.randn(1, 8, 17, 9)
+
+    captured = _capture_step_estimate(
+        module,
+        x,
+        prediction,
+        {"atf_foa_prior": prior},
+    )
+    residual = channels_to_ri(prediction.expand(2, -1, -1, -1))
+
+    torch.testing.assert_close(captured["estimate"], prior + residual)
+
+
+def test_pairwise_phat_hook_is_appended_for_any_spectral_model():
+    config = _training_config(None)
+    config["model"]["in_channels"] = 20
+    config["data"]["features"] = {"pairwise_phat_ipd": {"pairs": "all"}}
+    module = TrainingModule(config)
+    x = torch.randn(2, 4, 17, 9, 2)
+    phat = torch.randn(2, 6, 17, 9, 2)
+    prediction = torch.randn(1, 8, 17, 9)
+    captured_input = {}
+
+    class CaptureInput(FixedPrediction):
+        def forward(self, model_input):
+            captured_input["value"] = model_input
+            return super().forward(model_input)
+
+    module.model = CaptureInput(prediction)
+    module.calculate_losses = lambda estimate, target, stage: estimate.sum() * 0.0
+    module._step((x, torch.zeros_like(x), {"pairwise_phat_ipd": phat}))
+
+    assert captured_input["value"].shape == (2, 20, 17, 9)
+    torch.testing.assert_close(captured_input["value"][:, :8], ri_to_channels(x))
+    torch.testing.assert_close(captured_input["value"][:, 8:], ri_to_channels(phat))
 
 
 def test_training_module_rejects_stft_frequency_mismatch_early():
