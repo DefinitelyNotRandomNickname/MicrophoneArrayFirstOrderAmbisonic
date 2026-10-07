@@ -14,6 +14,8 @@ a direct complex mapping from microphone-array spectrograms to FOA WXYZ.
 - Models for complex spectrogram processing.
 - HDF5-backed spatial audio dataset generation.
 - Complex tensor helpers for real/imaginary channel conversions.
+- Hook-based input features that can augment model inputs or prediction
+  composition without feature-specific training/dataset branches.
 - FOA-aware losses, including active-intensity DOA, energy ratio, covariance,
   SI-SDR, and multi-resolution STFT losses.
 - Pytest coverage for config merging, complex helpers, masking, audio
@@ -119,7 +121,7 @@ Model roadmap:
 Input roadmap:
 - [x] STFT,
 - [x] Geometry/ATF-conditioned FOA prior,
-- [ ] Pairwise PHAT/IPD (optionally ILD),
+- [x] Pairwise PHAT/IPD,
 - [ ] Local spatial convariance/coherence,
 - [ ] Spherical SRP-PHAT map.
 
