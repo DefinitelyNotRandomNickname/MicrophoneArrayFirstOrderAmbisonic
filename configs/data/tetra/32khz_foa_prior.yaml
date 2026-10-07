@@ -1,0 +1,39 @@
+data:
+  seconds: 3.0
+  sr: 32000
+  num_sources: 6
+
+  train_rir_path: tmp/train_rir_dataset_tetrahedron_32000hz_3.0s.h5
+  valid_rir_path: tmp/valid_rir_dataset_tetrahedron_32000hz_3.0s.h5
+  audio_paths:
+  - /data/soundsource/dns32k_trim/DNS2022_speech_mos42/clean_fullband/read_speech
+  noise_paths:
+  - /data/soundsource/noise32k/DNS_noise_fullband
+
+  # Environment noise
+  snr_db: [-10, 10]
+  noise_in_target: true
+
+  # Electrical noise
+  self_noise_db: [20, 45]
+
+  max_len: 1e4
+
+  stft:
+    n_fft: 1024
+    hop_length: 256   # 75% overlap
+    win_length: 1024
+
+  normalize: True
+
+  features:
+    atf_foa_prior:
+      enabled: true
+
+      geometry_source: actual
+
+      num_directions: 256
+      sound_speed: 343.0
+      reg_eps: 1.0e-3
+      max_wng_db: 20.0
+      cache_size: 256

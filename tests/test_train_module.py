@@ -139,3 +139,25 @@ def test_training_module_rejects_stft_frequency_mismatch_early():
         assert "does not match" in str(error)
     else:
         raise AssertionError("Expected an STFT frequency mismatch error")
+
+
+def test_compile_option_keeps_checkpoint_keys_unchanged():
+    eager = TrainingModule(_training_config(None))
+
+    config = _training_config(None)
+    config["training"]["compile"] = True
+    compiled = TrainingModule(config)
+
+    assert compiled.model._compiled_call_impl is not None
+    assert eager.model._compiled_call_impl is None
+
+    # nn.Module.compile does not add the `_orig_mod.` prefix that wrapping in
+    # torch.compile would, so eager and compiled checkpoints are interchangeable.
+    assert list(compiled.state_dict()) == list(eager.state_dict())
+    compiled.load_state_dict(eager.state_dict())
+
+
+def test_compile_is_off_by_default():
+    module = TrainingModule(_training_config(None))
+
+    assert module.model._compiled_call_impl is None

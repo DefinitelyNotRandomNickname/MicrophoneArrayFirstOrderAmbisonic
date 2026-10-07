@@ -49,7 +49,7 @@ cuda = [
 
 [tool.setuptools.packages.find]
 where = ["."]
-include = ["data", "models", "projects", "utils"]
+include = ["data*", "models*", "projects*", "utils*"]
 
 [tool.black]
 line-length = 88

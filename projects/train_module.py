@@ -8,6 +8,13 @@ from utils.losses import SPECTROGRAM_LOSSES, WAVE_LOSSES
 from utils.masking import MASKS
 from projects.schedulers import build_lr_scheduler
 
+# How the network output is combined with the geometry/ATF FOA prior:
+#   none        the prior is only an extra input feature
+#   residual    the network predicts a correction added to the prior
+#   mask        the masking function is applied to the prior instead of the
+#               microphone signals
+PRIOR_COMBINE_MODES = ("none", "residual", "mask")
+
 
 class TrainingModule(pl.LightningModule):
     def __init__(self, cfg):
@@ -34,6 +41,26 @@ class TrainingModule(pl.LightningModule):
         masking = self.tcfg.get("masking", "complex")
         self.masking_fn = None if masking is None else MASKS[masking]
 
+        self.prior_as_input = self.tcfg.get("prior_as_input", True)
+        self.prior_combine = self.tcfg.get("prior_combine", "none")
+
+        if self.prior_combine not in PRIOR_COMBINE_MODES:
+            raise ValueError(
+                f"training.prior_combine={self.prior_combine} is not one of "
+                f"{sorted(PRIOR_COMBINE_MODES)}"
+            )
+
+        if self.prior_combine == "mask" and self.masking_fn is None:
+            raise ValueError(
+                "training.prior_combine='mask' needs training.masking to be set"
+            )
+
+        self._check_input_channels()
+
+        # In place compilation
+        if self.tcfg.get("compile", False):
+            self.model.compile(mode=self.tcfg.get("compile_mode", "default"))
+
         self.lr = self.tcfg.get("lr", 1e-3)
         self.weight_decay = self.tcfg.get("weight_decay", 0.0)
 
@@ -42,23 +69,67 @@ class TrainingModule(pl.LightningModule):
 
         self.save_hyperparameters(cfg)
 
+    def _check_input_channels(self):
+        """
+        Catches a model config that was not widened for the extra prior
+        channels (or was widened without the feature being enabled).
+
+        Reads the width from the built model, since models configure it
+        differently.
+        """
+        in_channels = getattr(self.model, "in_channels", None)
+
+        if in_channels is None:
+            return
+
+        features = self.dcfg.get("features") or {}
+        prior_cfg = features.get("atf_foa_prior", None)
+        has_prior = prior_cfg is not None and prior_cfg.get("enabled", True)
+
+        expected = 8 + 8 * int(has_prior and self.prior_as_input)
+
+        if int(in_channels) != expected:
+            raise ValueError(
+                f"model.in_channels={in_channels} does not match the enabled "
+                f"input features ({expected} channels: 4 microphones"
+                + (" + 4 FOA prior" if has_prior and self.prior_as_input else "")
+                + ", real and imaginary)"
+            )
+
     def forward(self, x):
         return self.model(x)
 
     def _step(self, batch, stage="train"):
-        x, y = batch
+        x, y = batch[0], batch[1]
+        prior = batch[2] if len(batch) > 2 else None
 
         x = x.to(self.device, dtype=self.dtype)
         y = y.to(self.device, dtype=self.dtype)
+
+        if prior is not None:
+            prior = prior.to(self.device, dtype=self.dtype)
+        elif self.prior_combine != "none":
+            raise ValueError(
+                f"training.prior_combine={self.prior_combine} needs the dataset "
+                "to provide a FOA prior; enable data.features.atf_foa_prior"
+            )
 
         x_complex = x
         if not torch.is_complex(x):
             x_complex = ri_to_channels(x)
 
-        pred = self(x_complex)
+        model_in = x_complex
+        if prior is not None and self.prior_as_input:
+            model_in = torch.cat([x_complex, ri_to_channels(prior)], dim=1)
+
+        pred = self(model_in)
         pred = channels_to_ri(pred)
 
-        if self.masking_fn is None:
+        if self.prior_combine == "residual":
+            y_hat = (prior + pred).contiguous().to(dtype=x.dtype)
+        elif self.prior_combine == "mask":
+            y_hat = self.masking_fn(prior, pred)
+        elif self.masking_fn is None:
             y_hat = pred.contiguous().to(dtype=x.dtype)
         else:
             y_hat = self.masking_fn(x, pred)
@@ -74,13 +145,30 @@ class TrainingModule(pl.LightningModule):
         self._step(batch, stage="val")
 
     def calculate_losses(self, estimate, target, stage):
-        total_loss = 0.0
+        with torch.autocast(device_type=estimate.device.type, enabled=False):
+            estimate = estimate.to(
+                dtype=torch.complex64 if estimate.is_complex() else torch.float32
+            )
+            target = target.to(
+                dtype=torch.complex64 if target.is_complex() else torch.float32
+            )
+            return self._calculate_losses(estimate, target, stage)
+
+    def _calculate_losses(self, estimate, target, stage):
+        total_loss = estimate.real.new_tensor(0.0)
 
         for loss, loss_params in self.stft_losses.items():
             loss_fn = SPECTROGRAM_LOSSES[loss]
             loss_val = loss_fn(estimate, target, **loss_params)
             total_loss += loss_val * loss_params["weight"]
-            self.log(f"{stage}_{loss}_loss", loss_val, prog_bar=True, on_epoch=True)
+            self.log(
+                f"{stage}_{loss}_loss",
+                loss_val,
+                prog_bar=True,
+                on_epoch=True,
+                sync_dist=True,
+                batch_size=target.size(0),
+            )
 
         estimate = istft_from_spectrogram(estimate, **self.dcfg["stft"])
         target = istft_from_spectrogram(target, **self.dcfg["stft"])
@@ -89,9 +177,23 @@ class TrainingModule(pl.LightningModule):
             loss_fn = WAVE_LOSSES[loss]
             loss_val = loss_fn(estimate, target, **loss_params)
             total_loss += loss_val * loss_params["weight"]
-            self.log(f"{stage}_{loss}_loss", loss_val, prog_bar=True, on_epoch=True)
+            self.log(
+                f"{stage}_{loss}_loss",
+                loss_val,
+                prog_bar=True,
+                on_epoch=True,
+                sync_dist=True,
+                batch_size=target.size(0),
+            )
 
-        self.log(f"{stage}_total_loss", total_loss, prog_bar=True, on_epoch=True)
+        self.log(
+            f"{stage}_total_loss",
+            total_loss,
+            prog_bar=True,
+            on_epoch=True,
+            sync_dist=True,
+            batch_size=target.size(0),
+        )
 
         return total_loss
 
@@ -109,8 +211,3 @@ class TrainingModule(pl.LightningModule):
             "optimizer": optimizer,
             "lr_scheduler": build_lr_scheduler(optimizer, sched_cfg, self),
         }
-
-    def on_before_optimizer_step(self, optimizer):
-        clip_val = self.tcfg.get("grad_clip_val", None)
-        if clip_val is not None:
-            torch.nn.utils.clip_grad_norm_(self.parameters(), clip_val)

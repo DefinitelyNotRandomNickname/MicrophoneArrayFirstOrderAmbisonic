@@ -74,11 +74,23 @@ def compute_stft(x, n_fft, hop_length, win_length, window=None, interleave=True)
 # -------------------------
 
 
+def next_fast_len(n):
+    """Smallest 5-smooth integer >= n"""
+    while True:
+        m = n
+        for p in (2, 3, 5):
+            while m % p == 0:
+                m //= p
+        if m == 1:
+            return n
+        n += 1
+
+
 def fft_convolve(signal, rir):
     T = signal.shape[0]
     L = rir.shape[1]
 
-    n = T + L - 1
+    n = next_fast_len(T + L - 1)
 
     S = np.fft.rfft(signal, n=n)
     R = np.fft.rfft(rir, n=n, axis=1)

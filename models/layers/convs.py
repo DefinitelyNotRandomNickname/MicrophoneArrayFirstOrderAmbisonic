@@ -1,3 +1,4 @@
+import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
@@ -77,6 +78,12 @@ class LocalTFConvBlock(nn.Module):
             nn.Conv2d(d_model, d_model, kernel_size=1),
             nn.Dropout2d(dropout),
         )
+
+        # DDP bucket stride fix for 1x1 conv
+        for p in self.net.parameters():
+            p.register_hook(
+                lambda g: g.clone(memory_format=torch.contiguous_format)
+            )
 
     def forward(self, x):
         return x + self.net(x)

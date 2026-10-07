@@ -1,6 +1,6 @@
-DATA_CONFIG="32khz"
-MODEL_CONFIG="UNet"
-TRAINING_CONFIG="base"
+DATA_CONFIG="tetra/32khz"
+MODEL_CONFIG="tfgridnet/TFGridNet"
+TRAINING_CONFIG="base_mapping"
 
 REPO_PATH="$(pwd)"
 
@@ -8,8 +8,8 @@ DATA_CONFIG_PATH="$REPO_PATH/configs/data/${DATA_CONFIG}.yaml"
 MODEL_CONFIG_PATH="$REPO_PATH/configs/models/${MODEL_CONFIG}.yaml"
 TRAINING_CONFIG_PATH="$REPO_PATH/configs/training/${TRAINING_CONFIG}.yaml"
 
-EXP_NAME="UNet_base_32M5"
-LOG_DIR="$REPO_PATH/.logs"
+EXP_NAME="${MODEL_CONFIG#*/}_${DATA_CONFIG%%/*}"
+LOG_DIR="$REPO_PATH/.logs/${MODEL_CONFIG%%/*}"
 
 
 python projects/train.py \
