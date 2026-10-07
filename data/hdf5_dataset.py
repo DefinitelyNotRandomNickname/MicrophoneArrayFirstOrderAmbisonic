@@ -10,7 +10,7 @@ import os
 from glob import glob
 
 from utils.audio import fft_convolve, compute_stft
-from utils.features import FEATURES
+from utils.features import FEATURES, FeaturePipeline
 
 
 class SpatialAudioDataset(Dataset):
@@ -64,7 +64,13 @@ class SpatialAudioDataset(Dataset):
         if stage == "valid":
             self.max_len //= 50
 
-        self.foa_prior = self._build_feature(dcfg, "atf_foa_prior")
+        self.features = FeaturePipeline.from_config(
+            cfg,
+            FEATURES,
+            n_fft=self.n_fft,
+            sr=self.sr,
+            num_mics=self.num_mics,
+        )
 
     def __len__(self):
         return self.max_len
@@ -108,31 +114,6 @@ class SpatialAudioDataset(Dataset):
             except (AttributeError, RuntimeError):
                 # Module teardown can invalidate h5py before Dataset cleanup.
                 pass
-
-    def _build_feature(self, dcfg, name):
-        """
-        Instantiates an optional input feature from `data.features.<name>`.
-        """
-        cfg = (dcfg.get("features") or {}).get(name, None)
-
-        if cfg is None or not cfg.get("enabled", True):
-            return None
-
-        return FEATURES[name](cfg, n_fft=self.n_fft, sr=self.sr)
-
-    def _prior_geometry(self, rir_idx):
-        """
-        Microphone offsets to condition the FOA prior on, plus a cache key.
-
-        The key is the RIR index whenever the geometry varies per sample, so
-        that repeated draws of the same room reuse the same encoder.
-
-        Static geometry is may be more or less useful during actual inference
-        depending on the array.
-        """
-        positions, key = self.foa_prior.positions_for(self.meta, rir_idx, self.num_mics)
-
-        return positions, rir_idx if key is None else key
 
     def _collect_wavs(self, paths):
         if not paths:
@@ -293,16 +274,12 @@ class SpatialAudioDataset(Dataset):
                 f"dataset index {idx}, RIR index {rir_idx}"
             )
 
-        if self.foa_prior is None:
-            return mems_spec, foa_spec
+        features = self.features.extract(
+            mems_spec,
+            meta=self.meta,
+            rir_idx=rir_idx,
+            num_mics=self.num_mics,
+            dataset_index=idx,
+        )
 
-        positions, key = self._prior_geometry(rir_idx)
-        prior_spec = self.foa_prior(mems_spec, positions, key=key)
-
-        if not torch.isfinite(prior_spec).all():
-            raise ValueError(
-                "FOA prior produced non-finite data at "
-                f"dataset index {idx}, RIR index {rir_idx}"
-            )
-
-        return mems_spec, foa_spec, prior_spec
+        return mems_spec, foa_spec, features

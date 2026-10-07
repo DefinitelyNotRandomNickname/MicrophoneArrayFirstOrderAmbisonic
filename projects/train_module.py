@@ -3,17 +3,17 @@ import pytorch_lightning as pl
 
 from models import MODELS
 from utils.audio import istft_from_spectrogram
-from utils.complex import ri_to_channels, channels_to_ri
+from utils.complex import channels_to_ri
+from utils.features import (
+    FEATURES,
+    FeaturePipeline,
+    PredictionContext,
+    as_model_channels,
+    direct_prediction,
+)
 from utils.losses import SPECTROGRAM_LOSSES, WAVE_LOSSES
 from utils.masking import MASKS
 from projects.schedulers import build_lr_scheduler
-
-# How the network output is combined with the geometry/ATF FOA prior:
-#   none        the prior is only an extra input feature
-#   residual    the network predicts a correction added to the prior
-#   mask        the masking function is applied to the prior instead of the
-#               microphone signals
-PRIOR_COMBINE_MODES = ("none", "residual", "mask")
 
 
 class TrainingModule(pl.LightningModule):
@@ -23,6 +23,15 @@ class TrainingModule(pl.LightningModule):
         self.mcfg = cfg["model"]
         self.tcfg = cfg["training"]
         self.dcfg = cfg["data"]
+
+        self.num_mics = int(self.dcfg.get("num_mics", 4))
+        self.feature_hooks = FeaturePipeline.from_config(
+            cfg,
+            FEATURES,
+            n_fft=self.dcfg["stft"]["n_fft"],
+            sr=self.dcfg.get("sr", 1),
+            num_mics=self.num_mics,
+        )
 
         configured_freqs = self.mcfg.get("num_freqs")
         n_fft = self.dcfg.get("stft", {}).get("n_fft")
@@ -41,19 +50,7 @@ class TrainingModule(pl.LightningModule):
         masking = self.tcfg.get("masking", "complex")
         self.masking_fn = None if masking is None else MASKS[masking]
 
-        self.prior_as_input = self.tcfg.get("prior_as_input", True)
-        self.prior_combine = self.tcfg.get("prior_combine", "none")
-
-        if self.prior_combine not in PRIOR_COMBINE_MODES:
-            raise ValueError(
-                f"training.prior_combine={self.prior_combine} is not one of "
-                f"{sorted(PRIOR_COMBINE_MODES)}"
-            )
-
-        if self.prior_combine == "mask" and self.masking_fn is None:
-            raise ValueError(
-                "training.prior_combine='mask' needs training.masking to be set"
-            )
+        self.feature_hooks.validate_model(self.masking_fn)
 
         self._check_input_channels()
 
@@ -71,8 +68,7 @@ class TrainingModule(pl.LightningModule):
 
     def _check_input_channels(self):
         """
-        Catches a model config that was not widened for the extra prior
-        channels (or was widened without the feature being enabled).
+        Catches a model config whose width does not match the feature hooks.
 
         Reads the width from the built model, since models configure it
         differently.
@@ -82,18 +78,17 @@ class TrainingModule(pl.LightningModule):
         if in_channels is None:
             return
 
-        features = self.dcfg.get("features") or {}
-        prior_cfg = features.get("atf_foa_prior", None)
-        has_prior = prior_cfg is not None and prior_cfg.get("enabled", True)
-
-        expected = 8 + 8 * int(has_prior and self.prior_as_input)
+        raw_channels = 2 * self.num_mics
+        expected = raw_channels + self.feature_hooks.input_channels
 
         if int(in_channels) != expected:
+            components = [f"microphone_stft={raw_channels}"]
+            components.extend(self.feature_hooks.describe_input_channels())
             raise ValueError(
-                f"model.in_channels={in_channels} does not match the enabled "
-                f"input features ({expected} channels: 4 microphones"
-                + (" + 4 FOA prior" if has_prior and self.prior_as_input else "")
-                + ", real and imaginary)"
+                f"model.in_channels={in_channels} does not match the configured "
+                f"input features ({expected} real channels: "
+                + ", ".join(components)
+                + ")"
             )
 
     def forward(self, x):
@@ -101,38 +96,36 @@ class TrainingModule(pl.LightningModule):
 
     def _step(self, batch, stage="train"):
         x, y = batch[0], batch[1]
-        prior = batch[2] if len(batch) > 2 else None
+        feature_values = batch[2] if len(batch) > 2 else {}
 
         x = x.to(self.device, dtype=self.dtype)
         y = y.to(self.device, dtype=self.dtype)
+        feature_values = self.feature_hooks.move_batch(
+            feature_values,
+            device=self.device,
+            dtype=self.dtype,
+        )
 
-        if prior is not None:
-            prior = prior.to(self.device, dtype=self.dtype)
-        elif self.prior_combine != "none":
-            raise ValueError(
-                f"training.prior_combine={self.prior_combine} needs the dataset "
-                "to provide a FOA prior; enable data.features.atf_foa_prior"
-            )
-
-        x_complex = x
-        if not torch.is_complex(x):
-            x_complex = ri_to_channels(x)
-
-        model_in = x_complex
-        if prior is not None and self.prior_as_input:
-            model_in = torch.cat([x_complex, ri_to_channels(prior)], dim=1)
+        model_in = self.feature_hooks.model_input(
+            as_model_channels(x),
+            feature_values,
+        )
 
         pred = self(model_in)
         pred = channels_to_ri(pred)
 
-        if self.prior_combine == "residual":
-            y_hat = (prior + pred).contiguous().to(dtype=x.dtype)
-        elif self.prior_combine == "mask":
-            y_hat = self.masking_fn(prior, pred)
-        elif self.masking_fn is None:
-            y_hat = pred.contiguous().to(dtype=x.dtype)
-        else:
-            y_hat = self.masking_fn(x, pred)
+        reference = torch.view_as_real(x) if torch.is_complex(x) else x
+        combine = direct_prediction if self.masking_fn is None else self.masking_fn
+        prediction = PredictionContext(
+            reference=reference,
+            combine=combine,
+            masking_fn=self.masking_fn,
+        )
+        prediction = self.feature_hooks.prediction_context(
+            prediction,
+            feature_values,
+        )
+        y_hat = prediction.estimate(pred)
 
         loss = self.calculate_losses(y_hat, y, stage)
 
